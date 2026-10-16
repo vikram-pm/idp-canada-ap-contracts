@@ -1,0 +1,342 @@
+{
+  "name": "IDP · Canada AP & Contracts (Gemini + n8n)",
+  "nodes": [
+    {
+      "id": "53d9da45-3eb9-49f1-a117-3292b6118361",
+      "parameters": {
+        "formTitle": "IDP · Upload a document",
+        "formDescription": "Synthetic test documents only. Reviewer UI: http://localhost:5678/webhook/idp-dashboard",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Document",
+              "fieldType": "file",
+              "requiredField": true,
+              "multipleFiles": false,
+              "acceptFileTypes": ".pdf,.png,.jpg,.jpeg"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Upload form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "21d8fb55-deee-4539-b596-d40af1949b1d"
+    },
+    {
+      "id": "7a3028c0-0ed8-4440-bb17-21f7e2fc77a6",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "idp-upload",
+        "responseMode": "onReceived",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "name": "Upload request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        480
+      ],
+      "webhookId": "f42d0d13-cc81-4f5b-af4b-a1b4230b14cb"
+    },
+    {
+      "id": "5b601d58-3107-4e27-bb01-8cc30220b483",
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// ===== n8n Code node: \"Prepare request\" =====\n// Mode: Run Once for All Items. Input: the upload form.\n\n// ---------- CONFIG (single source of truth, edit here) ----------\nconst config = {\n  // Free-tier Flash model. \"-latest\" aliases move; pin a stable ID from\n  // https://ai.google.dev/gemini-api/docs/models before you record demo results.\n  model: 'gemini-flash-lite-latest',\n  amountTolerance: 0.02,          // CAD rounding tolerance for tax and totals\n  spotAuditRate: 0.05,            // 5% of auto-approved docs go to a reviewer\n  defaultPlaceOfSupply: 'ON',     // used when bill-to province cannot be read\n  criticalInvoiceFields: ['supplier_name', 'invoice_number', 'invoice_date_raw', 'subtotal', 'total'],\n  criticalNdaFields: ['parties', 'governing_law'],\n};\n\nconst item = $input.first();\nconst binKey = Object.keys(item.binary || {})[0];\nif (!binKey) throw new Error('No file received. Upload a PDF, PNG or JPG.');\nconst meta = item.binary[binKey];\nconst buf = await this.helpers.getBinaryDataBuffer(0, binKey);\n\nconst INVOICE_FIELDS = [\n  'supplier_name', 'supplier_address', 'supplier_province', 'gst_hst_number', 'qst_number',\n  'bill_to_address', 'bill_to_province', 'invoice_number', 'invoice_date_raw', 'due_date_raw',\n  'payment_terms', 'po_number', 'currency', 'subtotal', 'gst_amount', 'hst_amount', 'qst_amount',\n  'pst_amount', 'total',\n];\nconst NDA_FIELDS = [\n  'parties', 'effective_date', 'nda_type', 'term', 'confidentiality_period',\n  'governing_law', 'privacy_clause', 'quebec_party',\n];\n\nconst schema = {\n  type: 'OBJECT',\n  properties: {\n    doc_type: { type: 'STRING', enum: ['invoice', 'nda', 'other'] },\n    language: { type: 'STRING', enum: ['en', 'fr', 'other'] },\n    fields: {\n      type: 'ARRAY',\n      items: {\n        type: 'OBJECT',\n        properties: {\n          name: { type: 'STRING' },\n          value: { type: 'STRING' },\n          source_quote: { type: 'STRING' },\n          page: { type: 'INTEGER' },\n          found: { type: 'BOOLEAN' },\n        },\n        required: ['name', 'value', 'source_quote', 'found'],\n      },\n    },\n  },\n  required: ['doc_type', 'language', 'fields'],\n};\n\nconst instructions = `You extract data for Cognizant Canada Accounts Payable and Contracts.\nThe attached document may be in English or French.\n\n1. Classify doc_type: \"invoice\" (vendor invoice / facture), \"nda\" (non-disclosure / confidentiality agreement) or \"other\".\n2. Return one entry in \"fields\" for EVERY field listed for that type, in the order given.\n   Invoice fields: ${INVOICE_FIELDS.join(', ')}\n   NDA fields: ${NDA_FIELDS.join(', ')}\n3. Rules:\n   - Copy each value exactly as printed. Do not convert dates, numbers or currency.\n     (TPS = GST, TVH = HST, TVQ = QST, TVP = PST.)\n   - source_quote = the exact text span (max 20 words) where you read the value.\n   - If a field is not on the document: found=false, value=\"\", source_quote=\"\". Never guess or infer.\n   - quebec_party: \"Yes\" only if a party's address is in Quebec, else \"No\".\n   - Never return bank account, transit, institution or SIN numbers in any field.`;\n\nconst pass2 = `\n\nSecond, independent read: ignore any earlier answer and re-read the document from the top.\nPay extra attention to tax registration numbers, tax amounts and the invoice date.`;\n\nconst mk = (extra, temperature) => ({\n  contents: [{\n    role: 'user',\n    parts: [\n      { text: instructions + extra },\n      { inlineData: { mimeType: meta.mimeType, data: buf.toString('base64') } },\n    ],\n  }],\n  generationConfig: { temperature, responseMimeType: 'application/json', responseSchema: schema },\n});\n\nreturn [{ json: {\n  config,\n  docId: 'DOC-' + Date.now().toString(36).toUpperCase(),\n  receivedAt: new Date().toISOString(),\n  fileName: meta.fileName,\n  mimeType: meta.mimeType,\n  body1: mk('', 0),\n  body2: mk(pass2, 0.4),\n}}];\n"
+      },
+      "name": "Prepare request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        380
+      ]
+    },
+    {
+      "id": "89a426d3-6381-40ff-a000-2136383f4b85",
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/{{ $('Prepare request').first().json.config.model }}:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Prepare request').first().json.body1) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "name": "Gemini · pass 1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        380
+      ],
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "id": "cecbedb6-c965-4137-be9e-f091e0904222",
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/{{ $('Prepare request').first().json.config.model }}:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Prepare request').first().json.body2) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "name": "Gemini · pass 2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        380
+      ],
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "id": "3b86548f-bcf5-4643-874d-22b51f1950e8",
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// ===== n8n Code node: \"Validate & route (Canadian rules)\" =====\n// Mode: Run Once for All Items. Input: response of \"Gemini · pass 2\".\n// Reads pass 1 and config from earlier nodes by name.\n\nconst prep = $('Prepare request').first().json;\nconst cfg = prep.config;\n\nfunction parseGemini(resp) {\n  if (!resp || !resp.candidates) return { doc_type: 'other', language: 'other', fields: [], _parseError: 'AI unavailable' };\n  const text = resp?.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || '';\n  try { return JSON.parse(text.replace(/```json|```/g, '').trim()); }\n  catch (e) { return { doc_type: 'other', language: 'other', fields: [], _parseError: String(e) }; }\n}\nconst p1 = parseGemini($('Gemini · pass 1').first().json);\nconst p2 = parseGemini($input.first().json);\n\nconst toMap = (r) => Object.fromEntries((r.fields || []).map(f => [f.name, f]));\nconst f1 = toMap(p1), f2 = toMap(p2);\nconst docType = p1.doc_type === p2.doc_type ? p1.doc_type : 'other';\n\n// ---------- helpers ----------\nconst norm = (s) => String(s ?? '').toLowerCase().replace(/[\\s\\u00a0\\u202f$.,:]/g, '');\nfunction money(raw) {\n  if (!raw) return null;\n  let s = String(raw).replace(/[^\\d.,-]/g, '');\n  if (!s) return null;\n  const lastDot = s.lastIndexOf('.'), lastComma = s.lastIndexOf(',');\n  if (lastComma > lastDot) {                       // French: 4 240,00\n    const dec = s.length - lastComma - 1;\n    s = dec === 2 ? s.replace(/\\./g, '').replace(',', '.') : s.replace(/,/g, '');\n  } else { s = s.replace(/,/g, ''); }              // English: 4,240.00\n  const n = parseFloat(s);\n  return Number.isFinite(n) ? n : null;\n}\nconst PROV_NAMES = { 'ontario':'ON','quebec':'QC','québec':'QC','british columbia':'BC','colombie-britannique':'BC','alberta':'AB','manitoba':'MB','saskatchewan':'SK','nova scotia':'NS','nouvelle-écosse':'NS','new brunswick':'NB','nouveau-brunswick':'NB','newfoundland':'NL','terre-neuve':'NL','prince edward island':'PE','île-du-prince-édouard':'PE','yukon':'YT','northwest territories':'NT','nunavut':'NU' };\nconst POSTAL_FIRST = { A:'NL',B:'NS',C:'PE',E:'NB',G:'QC',H:'QC',J:'QC',K:'ON',L:'ON',M:'ON',N:'ON',P:'ON',R:'MB',S:'SK',T:'AB',V:'BC',Y:'YT' };\nfunction province(raw) {\n  const s = String(raw || '').trim();\n  const code = s.toUpperCase().match(/\\b(ON|QC|BC|AB|MB|SK|NS|NB|NL|PE|YT|NT|NU)\\b/);\n  if (code) return code[1];\n  const low = s.toLowerCase();\n  for (const [k, v] of Object.entries(PROV_NAMES)) if (low.includes(k)) return v;\n  const pc = s.toUpperCase().match(/\\b([ABCEGHJKLMNPRSTVXY])\\d[A-Z]\\s?\\d[A-Z]\\d\\b/);\n  return pc ? POSTAL_FIRST[pc[1]] || null : null;\n}\n// Simplified rate table. VERIFY with the tax team before use. Rates change.\nconst RATES = { ON:{hst:0.13}, NS:{hst:0.14}, NB:{hst:0.15}, NL:{hst:0.15}, PE:{hst:0.15},\n  QC:{gst:0.05,qst:0.09975}, BC:{gst:0.05,pst:0.07}, MB:{gst:0.05,pst:0.07}, SK:{gst:0.05,pst:0.06},\n  AB:{gst:0.05}, NT:{gst:0.05}, NU:{gst:0.05}, YT:{gst:0.05} };\nconst near = (a, b) => a != null && b != null && Math.abs(a - b) <= cfg.amountTolerance;\n\n// ---------- semantic comparison (small differences are resolved automatically) ----------\nconst MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];\nconst MONFULL = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];\nconst FR = { janv: 0, 'févr': 1, fevr: 1, mars: 2, avr: 3, mai: 4, juin: 5, juil: 6, 'août': 7, aout: 7, sept: 8, oct: 9, nov: 10, 'déc': 11, dec: 11 };\nfunction toDate(raw) {\n  const s = String(raw || '').trim().toLowerCase();\n  let y, m, d, assumed = false, x;\n  if ((x = s.match(/^(\\d{4})[-\\/.](\\d{1,2})[-\\/.](\\d{1,2})$/))) { y = +x[1]; m = +x[2]; d = +x[3]; }\n  else if ((x = s.match(/^(\\d{1,2})[-\\/.](\\d{1,2})[-\\/.](\\d{2,4})$/))) {\n    y = +x[3] < 100 ? 2000 + +x[3] : +x[3]; const p = +x[1], q = +x[2];\n    if (p > 12) { d = p; m = q; } else if (q > 12) { m = p; d = q; } else { m = p; d = q; assumed = p !== q; }  // standard: month/day/year\n  } else if ((x = s.match(/^([a-zéû]+)\\.?\\s+(\\d{1,2}),?\\s+(\\d{4})$/))) { m = MONFULL.indexOf(x[1].slice(0, 3)) + 1; d = +x[2]; y = +x[3]; }\n  else if ((x = s.match(/^(\\d{1,2})(?:er)?\\s+([a-zéû]+)\\.?\\s+(\\d{4})$/))) { const k = x[2].replace(/\\.$/, ''); m = (FR[k] ?? FR[k.slice(0, 4)] ?? MONFULL.indexOf(k.slice(0, 3))) + 1; d = +x[1]; y = +x[3]; }\n  if (!y || !m || !d || m < 1 || m > 12 || d < 1 || d > 31) return null;\n  return { iso: `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`, label: `${MON[m - 1]} ${d}, ${y}`, assumed };\n}\nconst words = (s) => String(s || '').toLowerCase().replace(/\\((test entity|entite test)\\)/g, '').split(/[^a-z0-9à-ÿ]+/).filter((w) => w.length > 1 && !['the', 'of', 'and', 'et', 'la', 'le', 'de', 'des', 'inc', 'ltd', 'laws', 'law'].includes(w));\nfunction same(name, x, y) {\n  if (!x || !y) return false;\n  if (/province/.test(name)) { const p = province(x), q = province(y); return !!p && p === q; }\n  if (/amount|total|subtotal/.test(name)) { const p = money(x), q = money(y); return p != null && q != null && Math.abs(p - q) <= 0.01; }\n  if (/date/.test(name)) { const p = toDate(x), q = toDate(y); return !!p && !!q && p.iso === q.iso; }\n  if (/(_number|currency)$/.test(name)) return norm(x).replace(/[^a-z0-9]/g, '') === norm(y).replace(/[^a-z0-9]/g, '');\n  const A = words(x), B = words(y); if (!A.length || !B.length) return false;\n  const [s, l] = A.length <= B.length ? [A, B] : [B, A];\n  return s.filter((w) => l.includes(w)).length / s.length >= 0.8;   // e.g. \"State of New York\" vs \"New York\"\n}\nconst autoNotes = [];\n// Fields that are informational only: never a reason to send a document to review.\nconst INFO_ONLY = ['invoice_number', 'gst_hst_number', 'po_number', 'payment_terms', 'due_date_raw', 'supplier_address', 'bill_to_address'];\n// Canadian display formats\nconst cad = (v) => { const n = money(v); return n == null ? null : '$' + n.toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };\n\n// ---------- per-field status ----------\nconst fields = {};\nconst issues = [];          // { field, severity: 'critical'|'warn'|'info', message }\nconst names = new Set([...Object.keys(f1), ...Object.keys(f2)]);\nfor (const n of names) {\n  const a = f1[n] || {}, b = f2[n] || {};\n  const grounded = !!(a.found && String(a.value || '').trim() && String(a.source_quote || '').trim());\n  const exact = norm(a.value) === norm(b.value);\n  const agree = exact || same(n, a.value, b.value);\n  fields[n] = { value: a.value || '', source_quote: a.source_quote || '', page: a.page ?? null,\n                grounded, agree, status: grounded ? (agree ? 'verified' : 'check') : 'missing', reasons: [] };\n  if (grounded && !agree) { if (INFO_ONLY.includes(n)) { fields[n].status = 'verified'; fields[n].note = `Two reads differ (\"${a.value}\" vs \"${b.value}\"); not a review item`; } else fields[n].reasons.push(`Two reads disagree: \"${a.value}\" vs \"${b.value}\"`); }\n  if (grounded && agree && !exact && b.value) { fields[n].auto = `Two reads matched in meaning (\"${a.value}\" = \"${b.value}\")`; autoNotes.push(n); }\n  if (/date/.test(n) && a.value) { const d = toDate(a.value); if (d) { fields[n].display = d.label; if (d.assumed) { fields[n].auto = 'Read as month/day/year (company date standard)'; autoNotes.push(n); } } }\n}\nconst F = (n) => fields[n] || { value: '', status: 'missing', reasons: [], grounded: false };\nfunction flag(field, severity, message) {\n  if (severity !== 'critical' || INFO_ONLY.includes(field)) { severity = 'info'; if (fields[field]) fields[field].note = message; issues.push({ field, severity, message }); return; }\n  issues.push({ field, severity, message });\n  if (fields[field]) {\n    fields[field].reasons.push(message);\n    if (severity === 'critical') fields[field].status = 'missing';\n    else if (fields[field].status === 'verified') fields[field].status = 'check';\n  }\n}\n\n// ---------- invoice rules ----------\nlet supplierProv = null, supplyProv = null, totals = {};\nif (docType === 'invoice') {\n  for (const n of cfg.criticalInvoiceFields.filter((x) => !INFO_ONLY.includes(x))) {\n    if (F(n).status !== 'verified') flag(n, 'critical', F(n).status === 'missing' ? `${n} not found in document` : (F(n).reasons[0] || `${n} needs confirmation`));\n  }\n  supplierProv = province(F('supplier_province').value) || province(F('supplier_address').value);\n  // Place of supply: for most services this follows the recipient (bill-to) address, not the supplier.\n  supplyProv = province(F('bill_to_province').value) || province(F('bill_to_address').value) || cfg.defaultPlaceOfSupply;\n\n  const sub = money(F('subtotal').value), tot = money(F('total').value);\n  const gst = money(F('gst_amount').value), hst = money(F('hst_amount').value);\n  const qst = money(F('qst_amount').value), pst = money(F('pst_amount').value);\n  totals = { sub, tot, gst, hst, qst, pst };\n\n  // Registration numbers\n  // GST/HST registration number: extracted and displayed only (company rule: not a review item).\n  const bn = String(F('gst_hst_number').value || '').toUpperCase().replace(/\\s/g, '');\n  if (fields.gst_hst_number && /^\\d{9}RT\\d{4}$/.test(bn)) fields.gst_hst_number.display = bn.slice(0, 9) + ' RT' + bn.slice(11);\n  // QST number: mandatory for every Quebec supplier (company rule), and required whenever QST is charged.\n  const qn = String(F('qst_number').value || '').toUpperCase().replace(/\\s/g, '');\n  if (!fields.qst_number) fields.qst_number = { value: '', source_quote: '', page: null, grounded: false, agree: true, status: 'missing', reasons: [] };\n  if ((supplierProv === 'QC' || qst) && !qn) flag('qst_number', 'critical', supplierProv === 'QC' ? 'Quebec supplier: QST registration number is mandatory and was not found on the invoice.' : 'QST charged but no QST registration number. Input tax refund (ITR) cannot be claimed.');\n  else if (qn && !/^\\d{10}TQ\\d{4}$/.test(qn)) flag('qst_number', 'critical', `QST number \"${F('qst_number').value}\" is not in the 1234567890 TQ0001 format.`);\n  else if (qn) fields.qst_number.display = qn.slice(0, 10) + ' TQ' + qn.slice(12);\n\n  // Expected tax for place of supply\n  const r = RATES[supplyProv];\n  if (!r) flag('bill_to_province', 'warn', 'Could not determine place of supply. Tax rate not checked.');\n  else if (sub != null) {\n    if (r.hst && !near(hst ?? gst, sub * r.hst)) flag(hst != null ? 'hst_amount' : 'gst_amount', 'critical', `Expected HST ${(r.hst*100).toFixed(0)}% for ${supplyProv} (${(sub*r.hst).toFixed(2)}), found ${hst ?? gst ?? 'none'}.`);\n    if (r.gst && !near(gst, sub * r.gst)) flag('gst_amount', 'critical', `Expected GST 5% for ${supplyProv} (${(sub*r.gst).toFixed(2)}), found ${gst ?? 'none'}.`);\n    if (r.qst && !near(qst, sub * r.qst)) flag('qst_amount', 'critical', `Expected QST 9.975% for ${supplyProv} (${(sub*r.qst).toFixed(2)}), found ${qst ?? 'none'}.`);\n    if (!r.qst && qst) flag('qst_amount', 'critical', `QST charged but place of supply is ${supplyProv}.`);\n    if (r.pst && pst == null) flag('pst_amount', 'info', `${supplyProv} PST may apply. PST is not recoverable as an ITC; confirm with tax team.`);\n  }\n  // Arithmetic\n  if (sub != null && tot != null) {\n    const sum = sub + (gst||0) + (hst||0) + (qst||0) + (pst||0);\n    if (!near(sum, tot)) flag('total', 'critical', `Subtotal + taxes = ${sum.toFixed(2)} but total is ${tot.toFixed(2)}.`);\n  }\n  // Ambiguous DD/MM vs MM/DD\n  // Ambiguous dates are resolved automatically as month/day/year (company standard) and noted on the field.\n  // Duplicate (persists only in production executions of an active workflow)\n  const sd = $getWorkflowStaticData('global'); sd.seen = sd.seen || {};\n  const key = `${norm(F('supplier_name').value)}|${norm(F('invoice_number').value)}`;\n  if (F('invoice_number').value) {\n    if (sd.seen[key]) flag('invoice_number', 'info', `Possible duplicate: same supplier and invoice number received ${new Date(sd.seen[key]).toLocaleString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })}.`);\n    else sd.seen[key] = new Date().toISOString();\n  }\n}\n\n// ---------- Canadian display formats ----------\nfor (const [n, f] of Object.entries(fields)) {\n  if (!f.value) continue;\n  if (/amount|total|subtotal/.test(n)) { const c = cad(f.value); if (c) f.display = c; }\n  else if (/province/.test(n)) { const p = province(f.value); if (p) f.display = p; }\n}\n\n// ---------- NDA rules (Canadian playbook) ----------\nif (docType === 'nda') {\n  for (const n of cfg.criticalNdaFields) if (F(n).status !== 'verified') flag(n, 'critical', F(n).status === 'missing' ? `${n} not found in document` : (F(n).reasons[0] || `${n} needs confirmation`));\n  const law = String(F('governing_law').value || '').toLowerCase();\n  const canadian = /canada|ontario|quebec|québec|british columbia|alberta|manitoba|saskatchewan|nova scotia|new brunswick|newfoundland|prince edward island/.test(law);\n  if (law && !canadian) flag('governing_law', 'critical', `Non-Canadian governing law (\"${F('governing_law').value}\"). Legal sign-off required.`);\n  if (/^(yes|oui|true)/i.test(String(F('quebec_party').value || ''))) flag('quebec_party', 'critical', 'Quebec party: check whether a French version is required (Charter of the French Language).');\n  if (F('privacy_clause').status === 'missing') flag('privacy_clause', 'warn', 'No privacy clause found. Expect a PIPEDA (or Law 25) reference if personal information is exchanged.');\n}\n\n// ---------- route ----------\nconst critical = issues.filter(i => i.severity === 'critical');\nlet route;\nif (docType === 'other' || p1._parseError || p2._parseError) route = 'manual';\nelse if (critical.length) route = 'review';\nelse route = Math.random() < cfg.spotAuditRate ? 'audit_sample' : 'auto_approve';\n\nconst why = route === 'audit_sample' ? '5% spot audit'\n  : route === 'manual' ? (p1._parseError === 'AI unavailable' || p2._parseError === 'AI unavailable' ? 'AI unavailable (Gemini overloaded). Retry AI extraction or key the fields manually.' : 'Unclear document type or unreadable')\n  : issues.filter(i => i.severity !== 'info').map(i => i.message).join(' | ') || 'None';\n\nreturn [{ json: {\n  doc_id: prep.docId, received_at: prep.receivedAt, file_name: prep.fileName,\n  doc_type: docType, language: p1.language, route,\n  why_it_needs_you: why,\n  critical_issues: critical.length,\n  supplier_or_party: F('supplier_name').value || F('parties').value || '',\n  supplier_province: supplierProv || '', place_of_supply: supplyProv || '',\n  invoice_number: F('invoice_number').value || '', total: totals.tot ?? '',\n  fields_json: JSON.stringify(fields), model: cfg.model,\n  auto_resolved: autoNotes.join(', '),\n}}];\n"
+      },
+      "name": "Validate & route (Canadian rules)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        380
+      ]
+    },
+    {
+      "id": "b7520b88-97e3-4b96-a9e1-b69060496875",
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Saves each result (and the original file for the preview) inside n8n for the reviewer UI.\n// Static data persists only for production runs: publish the workflow.\nconst r = $input.first().json;\nconst sd = $getWorkflowStaticData('global');\nlet pdf = '', mime = '';\ntry { const part = $('Prepare request').first().json.body1.contents[0].parts[1].inlineData; if (part.data.length < 700000) { pdf = part.data; mime = part.mimeType; } } catch (e) {}\nsd.results = [{ ...r, processed_at: new Date().toISOString(), pdf, mime, status: r.route === 'auto_approve' ? 'approved' : 'open', resolutions: {} }, ...(sd.results || [])].slice(0, 100);\nsd.audit = [{ timestamp: new Date().toISOString(), doc_id: r.doc_id, file_name: r.file_name, actor_type: 'AI',\n  actor: 'Gemini + rules', event: 'Extracted, validated, routed to ' + r.route.replace('_', ' '),\n  detail: r.why_it_needs_you }, ...(sd.audit || [])].slice(0, 1000);\nreturn [{ json: { stored: true, doc_id: r.doc_id, route: r.route, app: 'http://localhost:5678/webhook/idp-dashboard' } }];\n"
+      },
+      "name": "Store result + audit",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        380
+      ]
+    },
+    {
+      "id": "d90f7355-1fee-4d4a-af1e-dd1be743f5bf",
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "idp-dashboard",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Dashboard request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        720
+      ],
+      "webhookId": "a4718f40-3c3d-4fa0-b0cc-bde9f0d8b3a5"
+    },
+    {
+      "id": "3c799d86-38e5-433f-9150-f35b1858a34a",
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// IDP reviewer front end (Figma S1 to S5) with upload, served from n8n static data.\nconst live = $getWorkflowStaticData('global');\nconst q = $input.first().json.query || {};\n// Page views read a copy so they never overwrite results saved by a concurrent processing run.\nconst sd = (q.act || q.reset) ? live : JSON.parse(JSON.stringify(live));\n// IDP reviewer front end: S1 Queue · S2 Invoice review · S3 NDA review · S4 Audit · S5 Ops.\n// Server-rendered from n8n static data. Actions arrive as query params and are written to the audit log.\nfunction renderApp(sd, q) {\n  sd.results = sd.results || []; sd.audit = sd.audit || [];\n  const esc = (s) => String(s ?? '').replace(/[&<>\"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' }[c]));\n  const now = () => new Date().toISOString();\n  const find = (id) => sd.results.find((r) => r.doc_id === id);\n  const fieldsOf = (r) => { try { return JSON.parse(r.fields_json || '{}'); } catch { return {}; } };\n  const flagged = (r) => { const f = fieldsOf(r), res = r.resolutions || {}; return Object.entries(f).filter(([k, v]) => (v.reasons || []).length && !res[k]); };\n  const clean = (t) => String(t || '').replace(/\\s*\\((TEST ENTITY|ENTITE TEST)\\)/gi, '');\n  const short = (m, k) => { const R = [[/QST charged but no QST/, 'Missing QST number'], [/GST\\/HST charged but no/, 'Missing GST/HST number'], [/not in the .* format/, 'Invalid tax number'], [/QST charged but place/, 'QST outside Quebec'], [/Expected (HST|GST|QST)/, 'Tax rate mismatch'], [/Subtotal \\+ taxes/, \"Totals don't add up\"], [/Ambiguous date/, 'Ambiguous date'], [/duplicate/i, 'Possible duplicate'], [/Non-Canadian governing law/, 'Non-Canadian governing law'], [/Quebec party/, 'Quebec party: French version?'], [/disagree/, 'Two reads disagree'], [/privacy clause/i, 'No privacy clause']]; for (const [re, l] of R) if (re.test(m)) return l; return /not found/.test(m) ? 'Missing ' + String(k).replace(/_raw$/, '').replace(/_/g, ' ') : m.slice(0, 40); };\n  const docLabel = (r) => r.invoice_number || (String(r.file_name).match(/NDA-\\d+/) || [r.doc_type === 'nda' ? 'NDA' : r.doc_id])[0];\n  const party = (r) => r.doc_type === 'nda' ? (clean(r.supplier_or_party).split(/;\\s*/).find((x) => !/cognizant/i.test(x)) || clean(r.supplier_or_party)) : clean(r.supplier_or_party);\n  const log = (r, event, detail) => sd.audit.unshift({ timestamp: now(), doc_id: r.doc_id, file_name: r.file_name, actor_type: 'Human', actor: 'Demo reviewer', event, detail: detail || '' });\n\n  // ---------- actions ----------\n  let notice = '';\n  if (q.reset === '1') { sd.results = []; sd.audit = []; sd.seen = {}; notice = 'Demo data cleared.'; }\n  const r0 = q.id ? find(q.id) : null;\n  if (r0 && q.act) {\n    r0.resolutions = r0.resolutions || {};\n    const f = fieldsOf(r0);\n    if (q.act === 'resolve' && q.field) {\n      const before = (f[q.field] || {}).value || '';\n      r0.resolutions[q.field] = { value: q.value ?? before, reason: q.reason || 'Verified on document', at: now() };\n      log(r0, `Resolved ${q.field}`, `${before === (q.value ?? before) ? 'Value kept' : `\"${before}\" → \"${q.value}\"`} · Reason: ${q.reason || 'Verified on document'}`);\n      notice = 'Issue resolved and logged.';\n    } else if (q.act === 'exception') {\n      r0.status = 'exception'; r0.owner = q.owner || 'AP Lead';\n      log(r0, `Sent to exception (owner: ${r0.owner})`, q.reason || ''); notice = `Sent to exception · owner ${r0.owner}.`;\n    } else if (q.act === 'approve') {\n      if (flagged(r0).length || r0.route === 'manual') notice = r0.route === 'manual' ? 'This document was never read by the AI. Retry extraction or send to exception.' : 'Resolve every issue before approving.';\n      else { r0.status = 'approved'; log(r0, 'Approved', 'All issues resolved'); notice = 'Approved and logged.'; }\n    } else if (q.act === 'reopen') { r0.status = 'open'; log(r0, 'Reopened', ''); notice = 'Reopened.'; }\n  }\n\n  // ---------- shared UI ----------\n  const C = { navy: '#000048', blue: '#3C66CE', dblue: '#173793', text: '#000048', muted: '#5A5F7A', line: '#D7DCEA', subtle: '#F4F6FB', canvas: '#EEF1F7' };\n  const chip = (t, kind) => { const k = { ok: ['#1F7A45', '#E3F8E7'], warn: ['#B54708', '#FEF0C7'], bad: ['#B42318', '#FEE4E2'], info: ['#3C66CE', '#EEF2FC'], gray: ['#5A5F7A', '#EBEDF3'] }[kind]; return `<span class=\"chip\" style=\"color:${k[0]};background:${k[1]}\">${esc(t)}</span>`; };\n  const statusChip = (r) => {\n    if (r.status === 'approved') return chip('✓ Approved', 'ok');\n    if (r.status === 'exception') return chip('● Exception', 'warn');\n    if (r.route === 'manual') return chip('● Manual', 'warn');\n    if (r.route === 'audit_sample') return chip('◆ 5% spot audit', 'info');\n    return chip('Needs review', 'gray');\n  };\n  const whyChip = (r) => {\n    if (r.status === 'approved') return r.route === 'auto_approve' ? chip('✓ Straight-through', 'ok') : chip('✓ Resolved', 'ok');\n    const open = flagged(r);\n    if (r.route === 'audit_sample') return chip('◆ 5% spot audit', 'info');\n    if (r.route === 'manual') return chip('● ' + (/AI unavailable/.test(r.why_it_needs_you) ? 'AI unavailable · retry' : 'Manual processing'), 'warn');\n    if (!open.length) return chip('✓ Ready to approve', 'ok');\n    const [k0, v] = open[0]; const msg = short(v.reasons[0], k0);\n    return chip((v.status === 'missing' ? '▲ ' : '● ') + msg, v.status === 'missing' ? 'bad' : 'warn') + (open.length > 1 ? ` <span class=\"muted small\">+${open.length - 1} more</span>` : '');\n  };\n  const url = (p) => '?' + Object.entries(p).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => k + '=' + encodeURIComponent(v)).join('&');\n  const NAV = [['queue', 'Document queue'], ['exceptions', 'Exceptions'], ['suppliers', 'Suppliers'], ['audit', 'Audit log'], ['ops', 'Ops dashboard']];\n  const shell = (active, body, opts = {}) => page(`\n    <aside class=\"nav\"><div class=\"brand\">IDP · AP &amp; Contracts</div><div class=\"brandsub\">Cognizant Canada (internal)</div>\n      ${NAV.map(([k, l]) => `<a class=\"navi ${k === active ? 'on' : ''}\" href=\"${url({ view: k })}\">${l}</a>`).join('')}\n      <div class=\"navfoot\">Synthetic data only</div></aside>\n    <main class=\"main\">${notice ? `<div class=\"notice\">${esc(notice)}</div>` : ''}${body}</main>`, opts);\n  const page = (inner, opts = {}) => `<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>IDP · ${esc(opts.title || 'Document queue')}</title>\n<style>\n*{box-sizing:border-box}body{margin:0;font-family:Inter,\"Segoe UI\",system-ui,Arial,sans-serif;color:${C.text};background:#fff;font-size:15px}\na{color:inherit;text-decoration:none}.muted{color:${C.muted}}.small{font-size:13px}\n.nav{position:fixed;inset:0 auto 0 0;width:232px;background:${C.navy};color:#fff;padding:28px 12px}\n.brand{font-weight:700;font-size:15px;padding:0 12px;white-space:nowrap}.fn{max-width:190px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.nw{white-space:nowrap}.brandsub{font-size:12px;color:#AEB6D9;padding:4px 12px 28px}\n.navi{display:block;padding:9px 16px;border-radius:6px;margin-bottom:8px;font-size:15px}.navi:hover{background:#0B0B5C}.navi.on{background:${C.dblue};font-weight:600}\n.navfoot{position:absolute;bottom:24px;left:24px;font-size:12px;color:#AEB6D9}\n.main{margin-left:232px;padding:32px 32px 48px}\nh1{font-size:28px;margin:0}.sub{color:${C.muted};margin:6px 0 0}\n.head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:20px}\n.btn{display:inline-block;padding:10px 16px;border-radius:8px;border:1px solid ${C.line};background:#fff;font-weight:600;font-size:14px;cursor:pointer;color:${C.text};font-family:inherit}\n.btn.primary{background:${C.navy};border-color:${C.navy};color:#fff}.btn.dis{background:#E3E6EF;border-color:#E3E6EF;color:#8A8FA6;cursor:not-allowed}\n.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px}.kpis.k6{grid-template-columns:repeat(3,1fr)}\n.kpi{border:1px solid ${C.line};border-radius:10px;padding:14px 16px}.kpi .l{font-size:13px;color:${C.muted};font-weight:500}.kpi .v{font-size:28px;font-weight:700;margin:4px 0}\n.tabs{display:flex;gap:32px;border-bottom:1px solid ${C.line};margin-bottom:16px}.tab{padding:8px 0;color:${C.muted}}.tab.on{color:${C.text};font-weight:600;border-bottom:2px solid ${C.navy}}\ntable{border-collapse:collapse;width:100%}th{background:${C.subtle};color:${C.muted};font-size:13px;font-weight:600;text-align:left;padding:12px}\nth:first-child{border-radius:6px 0 0 6px}th:last-child{border-radius:0 6px 6px 0}td{padding:14px 12px;border-bottom:1px solid ${C.line};vertical-align:middle}\ntr.row:hover td{background:${C.subtle};cursor:pointer}.chip{display:inline-block;padding:4px 10px;border-radius:12px;font-size:12px;font-weight:600;white-space:nowrap}\n.notice{background:#EEF2FC;color:${C.blue};padding:10px 14px;border-radius:8px;margin-bottom:16px;font-weight:500}\n.empty{padding:48px;text-align:center;color:${C.muted};border:1px dashed ${C.line};border-radius:10px}\n/* review */\n.top{position:fixed;top:0;left:0;right:0;height:64px;background:${C.navy};color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 24px;z-index:5}\n.crumb{color:#fff;font-weight:500}.keys{color:#AEB6D9;font-size:13px}\n.split{display:grid;grid-template-columns:50% 50%;position:fixed;top:64px;bottom:0;left:0;right:0}\n.docpane{background:${C.canvas};padding:16px 24px;display:flex;flex-direction:column;gap:8px}.docpane iframe{flex:1;width:100%;border:1px solid ${C.line};background:#fff;border-radius:2px}\n.panel{overflow:auto;padding:24px 24px 96px}.ph{display:flex;justify-content:space-between;align-items:flex-start}.ph h2{font-size:22px;margin:0}\n.sec{font-size:13px;font-weight:600;color:${C.muted};margin:20px 0 8px;text-transform:uppercase;letter-spacing:.2px}\n.f{display:grid;grid-template-columns:170px 1fr 136px 44px;align-items:center;gap:8px;border:1px solid ${C.line};border-radius:6px;padding:11px 14px;margin-bottom:8px}\n.f .lab{color:${C.muted}}.f .val{font-weight:500;word-break:break-word}.f .src{color:${C.blue};font-weight:600;font-size:13px;cursor:help}\n.f.bad{border-color:#B42318;background:#FFF6F5}.f.warn{border-color:#E8A302;background:#FFFBEB}\n.why{border-radius:6px;padding:12px 14px;margin:-4px 0 12px;font-size:14px}.why.bad{background:#FFF6F5}.why.warn{background:#FFFBEB}\n.why .acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;align-items:center}\n.why input,.why select{padding:9px 10px;border:1px solid ${C.line};border-radius:8px;font:inherit;font-size:14px;color:${C.text};background:#fff}\n.foot{position:fixed;bottom:0;left:50%;right:0;height:64px;border-top:1px solid ${C.line};background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 24px}\n.drawer{position:fixed;top:0;right:0;bottom:0;width:520px;background:#fff;border-left:1px solid ${C.line};box-shadow:-8px 0 24px rgba(0,0,72,.12);z-index:10;overflow:auto;padding:28px}\n.scrim{position:fixed;inset:0;background:rgba(0,0,72,.25);z-index:9}\n.ev{display:grid;grid-template-columns:12px 1fr;gap:12px;padding-bottom:18px}.dot{width:12px;height:12px;border-radius:6px;margin-top:4px}\n.bars{display:flex;align-items:flex-end;gap:28px;height:220px;padding:16px 8px 0}.bar{width:64px;border-radius:4px 4px 0 0}\n.card{border:1px solid ${C.line};border-radius:10px;padding:20px}\n.upwrap{position:fixed;inset:0;background:rgba(0,0,72,.35);z-index:20;align-items:center;justify-content:center}\n.upbox{background:#fff;border-radius:12px;padding:24px;width:620px;max-width:94vw;box-shadow:0 12px 40px rgba(0,0,72,.25)}\n.drop{display:flex;flex-direction:column;align-items:center;gap:6px;border:2px dashed ${C.line};border-radius:10px;padding:32px;cursor:pointer;background:${C.subtle}}.drop:hover{border-color:${C.blue}}\n.urow{display:grid;grid-template-columns:1fr 70px 150px;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid ${C.line}}\n.dragcover{display:none;position:fixed;inset:12px;border:3px dashed ${C.blue};border-radius:16px;background:rgba(238,242,252,.9);z-index:30;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:${C.blue};pointer-events:none}\n</style></head><body>${inner}\n<script>\n(function(){try{if(location.search.indexOf('act=')>-1||location.search.indexOf('reset=')>-1){var p=new URLSearchParams(location.search);['act','field','value','reason','owner','reset'].forEach(function(k){p.delete(k)});history.replaceState(null,'','?'+p.toString())}}catch(e){}\nwindow.go=function(o){var p=new URLSearchParams(location.search);['act','field','value','reason','owner','reset'].forEach(function(k){p.delete(k)});for(var k in o)p.set(k,o[k]);location.href='?'+p.toString()};\ndocument.addEventListener('keydown',function(e){if(/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))return;var a=document.getElementById('approve'),x=document.getElementById('exc');if(e.key==='a'&&a&&!a.disabled)a.click();if(e.key==='x'&&x)x.click()});\n${opts.live ? \"setInterval(function(){if(!window.__hold&&(!document.activeElement||document.activeElement===document.body))location.reload()},6000);\" : ''}})();\n</script></body></html>`;\n\n  const view = q.view || (q.id ? 'doc' : 'queue');\n  const sorted = [...sd.results].sort((a, b) => (flagged(b).filter(([, v]) => v.status === 'missing').length - flagged(a).filter(([, v]) => v.status === 'missing').length) || String(b.processed_at).localeCompare(String(a.processed_at)));\n  const needs = sd.results.filter((r) => !['approved', 'exception'].includes(r.status) && r.route !== 'manual');\n  const exc = sd.results.filter((r) => r.status === 'exception');\n  const autoA = sd.results.filter((r) => r.route === 'auto_approve');\n  const stp = sd.results.length ? Math.round((autoA.length / sd.results.length) * 100) : 0;\n  const amount = (r) => r.doc_type === 'invoice' && r.total !== '' && r.total != null ? '$' + Number(r.total).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'n/a';\n  const time = (t) => { try { return new Date(t).toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' }); } catch { return ''; } };\n  const kpi = (l, v, s) => `<div class=\"kpi\"><div class=\"l\">${l}</div><div class=\"v\">${v}</div><div class=\"muted small\">${s}</div></div>`;\n  const docTable = (rows) => rows.length ? `<table><tr><th>Document</th><th>Type</th><th>Supplier or party</th><th>Prov.</th><th>Amount (CAD)</th><th>Why it needs you</th><th>Received</th><th>Status</th></tr>\n    ${rows.map((r) => `<tr class=\"row\" onclick=\"location.href='${url({ view: 'doc', id: r.doc_id })}'\"><td><b>${esc(docLabel(r))}</b><div class=\"muted small fn\" title=\"${esc(r.file_name)}\">${esc(r.file_name)}</div></td>\n      <td>${r.doc_type === 'nda' ? 'NDA' : r.doc_type === 'invoice' ? 'Invoice' : 'Other'}${r.language === 'fr' ? ' · FR' : ''}</td><td>${esc(party(r))}</td><td>${esc(r.place_of_supply || r.supplier_province || '')}</td>\n      <td>${amount(r)}</td><td>${whyChip(r)}</td><td class=\"muted nw\">${time(r.processed_at)}</td><td>${statusChip(r)}</td></tr>`).join('')}</table>`\n    : `<div class=\"empty\">No documents here yet. Click Upload documents or drag files onto this page.</div>`;\n\n  // ---------- S1 queue / exceptions ----------\n  if (view === 'queue' || view === 'exceptions') {\n    const tab = view === 'exceptions' ? 'exceptions' : (q.tab || 'review');\n    const sets = { review: needs, auto: autoA, exceptions: exc, all: sorted };\n    const rows = sorted.filter((r) => sets[tab].includes(r));\n    const tabs = [['review', `Needs review (${needs.length})`], ['auto', 'Auto-approved'], ['exceptions', `Exceptions (${exc.length})`], ['all', 'All']];\n    return shell(view, `<div class=\"head\"><div><h1>${view === 'exceptions' ? 'Exceptions' : 'Document queue'}</h1><p class=\"sub\">Invoices and NDAs waiting for a person. Sorted by risk, then most recent.</p></div>\n      <div style=\"display:flex;gap:12px\"><button class=\"btn primary\" onclick=\"openUp()\">Upload documents</button><a class=\"btn\" href=\"${url({ view: 'queue', tab, reset: '1' })}\" onclick=\"return confirm('Clear all demo data?')\">Reset demo</a></div></div>\n      <div id=\"up\" class=\"upwrap\" style=\"display:none\" onclick=\"if(event.target===this)closeUp()\"><div class=\"upbox\">\n        <div style=\"display:flex;justify-content:space-between;align-items:center\"><h2 style=\"margin:0;font-size:20px\">Upload documents</h2><button class=\"btn\" onclick=\"closeUp()\">✕</button></div>\n        <p class=\"muted small\" style=\"margin:6px 0 16px\">Invoices or NDAs · PDF, PNG or JPG · max 20 MB each · synthetic data only</p>\n        <label id=\"drop\" class=\"drop\"><input id=\"files\" type=\"file\" multiple accept=\".pdf,.png,.jpg,.jpeg\" style=\"display:none\" onchange=\"pick(this.files)\"><b>Drop files here</b><span class=\"muted small\">or click to browse</span></label>\n        <div id=\"ulist\" style=\"margin-top:16px\"></div>\n        <div style=\"display:flex;justify-content:space-between;align-items:center;margin-top:16px\"><span id=\"unote\" class=\"muted small\">Each document takes about 20 seconds (two Gemini reads + Canadian rules).</span><button id=\"ugo\" class=\"btn primary\" onclick=\"startUp()\" disabled>Upload and process</button></div>\n      </div></div>\n      <div id=\"dragcover\" class=\"dragcover\">Drop to upload</div>\n      <script>\n      (function(){var Q=[],busy=false;\n        window.openUp=function(){document.getElementById('up').style.display='flex';window.__hold=true};\n        window.closeUp=function(){if(busy&&!confirm('Uploads are still running. Close anyway?'))return;document.getElementById('up').style.display='none';window.__hold=false;if(Q.length)location.reload()};\n        function row(f,i){return '<div class=\"urow\" id=\"ur'+i+'\"><span>'+f.name.replace(/[<>&]/g,'')+'</span><span class=\"muted small\">'+Math.max(1,Math.round(f.size/1024))+' KB</span><span class=\"chip\" id=\"us'+i+'\" style=\"color:#5A5F7A;background:#EBEDF3\">Ready</span></div>'}\n        window.pick=function(list){var ok=/\\.(pdf|png|jpe?g)$/i;for(var j=0;j<list.length;j++){var f=list[j];if(!ok.test(f.name)||f.size>20*1024*1024){alert(f.name+': PDF, PNG or JPG up to 20 MB only');continue}if(!Q.some(function(x){return x.name===f.name&&x.size===f.size}))Q.push(f)}\n          document.getElementById('ulist').innerHTML=Q.map(row).join('');document.getElementById('ugo').disabled=!Q.length||busy};\n        function set(i,t,fg,bg){var s=document.getElementById('us'+i);if(s){s.textContent=t;s.style.color=fg;s.style.background=bg}}\n        window.startUp=function(){if(busy||!Q.length)return;busy=true;document.getElementById('ugo').disabled=true;var i=0;\n          (function next(){if(i>=Q.length){busy=false;document.getElementById('unote').textContent='All sent. The queue refreshes as each result arrives.';setTimeout(function(){location.reload()},20000);return}\n            var k=i,fd=new FormData();fd.append('Document',Q[k],Q[k].name);set(k,'Uploading…','#3C66CE','#EEF2FC');\n            fetch('/webhook/idp-upload',{method:'POST',body:fd,mode:'no-cors'}).then(function(){set(k,'Processing ~20 s','#B54708','#FEF0C7');\n              var left=k<Q.length-1?22:0;setTimeout(function(){set(k,'✓ Sent to pipeline','#1F7A45','#E3F8E7');i++;next()},left*1000)})\n            .catch(function(e){set(k,'▲ Failed','#B42318','#FEE4E2');i++;next()})})()};\n        var dc=document.getElementById('dragcover'),depth=0;\n        document.addEventListener('dragenter',function(e){e.preventDefault();depth++;dc.style.display='flex'});\n        document.addEventListener('dragleave',function(){if(--depth<=0){depth=0;dc.style.display='none'}});\n        document.addEventListener('dragover',function(e){e.preventDefault()});\n        document.addEventListener('drop',function(e){e.preventDefault();depth=0;dc.style.display='none';if(e.dataTransfer&&e.dataTransfer.files.length){openUp();pick(e.dataTransfer.files)}});\n      })();\n      </script>\n      <div class=\"kpis\">${kpi('Needs review', needs.length, 'open documents')}${kpi('Auto-approved', autoA.length, stp + '% straight-through')}${kpi('Exceptions', exc.length, 'owner assigned')}${kpi('Processed', sd.results.length, 'documents in this demo')}</div>\n      <div class=\"tabs\">${tabs.map(([k, l]) => `<a class=\"tab ${k === tab ? 'on' : ''}\" href=\"${url({ view: 'queue', tab: k })}\">${l}</a>`).join('')}</div>${docTable(rows)}`, { live: true, title: 'Document queue' });\n  }\n\n  // ---------- S5 ops ----------\n  if (view === 'ops') {\n    let tot = 0, ver = 0; const reasons = {};\n    for (const r of sd.results) { for (const v of Object.values(fieldsOf(r))) { if (v.value || v.status !== 'missing') { tot++; if (v.status === 'verified') ver++; } } for (const z of Object.values(r.resolutions || {})) reasons[z.reason] = (reasons[z.reason] || 0) + 1; }\n    const counts = [['Auto-approved', autoA.length, C.blue], ['Needs review', needs.length, '#B7C6EE'], ['Exceptions', exc.length, '#E8A302'], ['Approved by reviewer', sd.results.filter((r) => r.status === 'approved' && r.route !== 'auto_approve').length, C.navy]];\n    const mx = Math.max(1, ...counts.map((c) => c[1]));\n    const rs = Object.entries(reasons).sort((a, b) => b[1] - a[1]); const rmax = Math.max(1, ...rs.map((x) => x[1]));\n    return shell('ops', `<div class=\"head\"><div><h1>Ops dashboard</h1><p class=\"sub\">This demo session · synthetic data · amounts in CAD</p></div></div>\n      <div class=\"kpis k6\">${kpi('Verified-field rate', (tot ? Math.round((ver / tot) * 100) : 0) + '%', 'grounded + two reads agree + rules pass')}${kpi('Straight-through rate', stp + '%', 'target 40 to 60%')}${kpi('Processed', sd.results.length, 'documents')}\n      ${kpi('Open in review', needs.length, 'waiting for a person')}${kpi('Exceptions', exc.length, 'owner assigned')}${kpi('Reviewer decisions', sd.audit.filter((e) => e.actor_type === 'Human').length, 'logged to audit trail')}</div>\n      <div style=\"display:grid;grid-template-columns:2fr 1fr;gap:16px\"><div class=\"card\"><b>Documents by outcome</b><div class=\"bars\">${counts.map(([l, v, c]) => `<div style=\"text-align:center\"><div class=\"small\" style=\"font-weight:600\">${v}</div><div class=\"bar\" style=\"height:${Math.max(4, (v / mx) * 170)}px;background:${c}\"></div><div class=\"small muted\" style=\"margin-top:6px;width:80px\">${l}</div></div>`).join('')}</div></div>\n      <div class=\"card\"><b>Top correction reasons</b>${rs.length ? rs.map(([k, v]) => `<div style=\"margin-top:14px\"><div style=\"display:flex;justify-content:space-between\"><span>${esc(k)}</span><b>${v}</b></div><div style=\"height:8px;background:${C.subtle};border-radius:4px;margin-top:6px\"><div style=\"height:8px;width:${(v / rmax) * 100}%;background:${C.blue};border-radius:4px\"></div></div></div>`).join('') : '<p class=\"muted\">No reviewer corrections yet.</p>'}</div></div>`, { live: true, title: 'Ops dashboard' });\n  }\n\n  // ---------- suppliers ----------\n  if (view === 'suppliers') {\n    const sup = {};\n    for (const r of sd.results.filter((x) => x.doc_type === 'invoice')) { const f = fieldsOf(r); const k = clean(r.supplier_or_party) || 'Unknown'; const s = sup[k] = sup[k] || { n: 0, prov: r.supplier_province, bn: (f.gst_hst_number || {}).value, qst: (f.qst_number || {}).value }; s.n++; }\n    const rows = Object.entries(sup);\n    return shell('suppliers', `<div class=\"head\"><div><h1>Suppliers</h1><p class=\"sub\">Built from processed invoices. Registration numbers drive ITC / ITR eligibility.</p></div></div>\n      ${rows.length ? `<table><tr><th>Supplier</th><th>Province</th><th>GST/HST number</th><th>QST number</th><th>Invoices</th></tr>${rows.map(([k, s]) => `<tr><td><b>${esc(k)}</b></td><td>${esc(s.prov || '')}</td><td>${esc(s.bn || '') || chip('▲ Missing', 'bad')}</td><td>${s.qst ? esc(s.qst) : s.prov === 'QC' ? chip('▲ Missing', 'bad') : '<span class=\"muted\">n/a</span>'}</td><td>${s.n}</td></tr>`).join('')}</table>` : '<div class=\"empty\">No invoices yet.</div>'}`, { title: 'Suppliers' });\n  }\n\n  // ---------- audit log (S4 full page) ----------\n  const timeline = (evs) => evs.length ? evs.map((e) => { const human = e.actor_type === 'Human'; return `<div class=\"ev\"><div class=\"dot\" style=\"background:${human ? C.navy : C.blue}\"></div><div><div class=\"small muted\">${time(e.timestamp)} &nbsp;${chip(e.actor, human ? 'gray' : 'info')}</div><div style=\"font-weight:500;margin-top:6px\">${esc(e.event)}</div>${e.detail ? `<div class=\"small muted\" style=\"margin-top:2px\">${esc(e.detail)}</div>` : ''}${!q.id && e.file_name ? `<div class=\"small muted\">${esc(e.file_name)}</div>` : ''}</div></div>`; }).join('') : '<p class=\"muted\">No events yet.</p>';\n  if (view === 'audit') return shell('audit', `<div class=\"head\"><div><h1>Audit log</h1><p class=\"sub\">Append-only. Every AI and human action, kept 6+ years for CRA.</p></div></div><div class=\"card\" style=\"max-width:820px\">${timeline(sd.audit)}</div>`, { title: 'Audit log' });\n\n  // ---------- S2 / S3 review ----------\n  const r = r0;\n  if (!r) return shell('queue', `<div class=\"empty\">Document not found. It may have been cleared. <a style=\"color:${C.blue}\" href=\"${url({ view: 'queue' })}\">Back to queue</a></div>`);\n  const done = ['approved', 'exception'].includes(r.status);\n  const f = fieldsOf(r), res = r.resolutions || {}, open = r.route === 'manual' ? [['_manual', { reasons: [r.why_it_needs_you] }]] : flagged(r), isNda = r.doc_type === 'nda';\n  const LABEL = { supplier_name: 'Legal name', supplier_province: 'Province', gst_hst_number: 'GST/HST number', qst_number: 'QST number', invoice_number: 'Invoice number', invoice_date_raw: 'Invoice date', due_date_raw: 'Due date', payment_terms: 'Payment terms', po_number: 'PO number', bill_to_province: 'Place of supply (bill-to)', subtotal: 'Subtotal', gst_amount: 'GST', hst_amount: 'HST', qst_amount: 'QST', pst_amount: 'PST', total: 'Total', currency: 'Currency', parties: 'Parties', nda_type: 'Type', effective_date: 'Effective date', term: 'Term', confidentiality_period: 'Confidentiality period', governing_law: 'Governing law', privacy_clause: 'Privacy clause', quebec_party: 'Quebec party' };\n  const SECTIONS = isNda ? [['Parties and term', ['parties', 'nda_type', 'effective_date', 'term', 'confidentiality_period']], ['Risk checks (Canadian playbook)', ['governing_law', 'privacy_clause', 'quebec_party']]]\n    : [['Supplier', ['supplier_name', 'supplier_province', 'gst_hst_number', 'qst_number']], ['Invoice', ['invoice_number', 'invoice_date_raw', 'due_date_raw', 'payment_terms', 'po_number', 'bill_to_province']], ['Amounts', ['currency', 'subtotal', 'gst_amount', 'hst_amount', 'qst_amount', 'pst_amount', 'total']]];\n  const dateOpts = (raw) => { const m = String(raw).match(/^(\\d{1,2})[\\/.-](\\d{1,2})[\\/.-](\\d{4})$/); if (!m) return []; const mo = (n) => ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][n - 1]; const iso = (d, mth) => `${m[3]}-${String(mth).padStart(2, '0')}-${String(d).padStart(2, '0')}`;\n    return [[`${+m[2]} ${mo(+m[1])} ${m[3]}`, iso(+m[2], +m[1]), 'Supplier uses MM/DD'], [`${+m[1]} ${mo(+m[2])} ${m[3]}`, iso(+m[1], +m[2]), 'Supplier uses DD/MM']]; };\n  const js = (o) => esc(JSON.stringify(o));\n  const fieldRow = (k) => {\n    const v = f[k] || { value: '', status: 'missing', reasons: [] }; const z = res[k]; const reasons = v.reasons || [];\n    if (!v.value && !reasons.length && !z) return '';\n    const kind = z ? 'ok' : reasons.length ? (v.status === 'missing' ? 'bad' : 'warn') : v.auto ? 'info' : v.status === 'verified' ? 'ok' : v.status === 'check' ? 'warn' : 'bad';\n    const label = z ? '✓ Resolved' : reasons.length ? (v.status === 'missing' ? (isNda ? '▲ Risk' : (v.value ? '▲ Invalid' : '▲ Missing')) : '▲ Check') : v.auto ? '✓ Auto-resolved' : (isNda ? '✓ Found' : '✓ Verified');\n    const shown = z ? (k === 'invoice_date_raw' && /^\\d{4}-/.test(z.value) ? z.value : z.value) : (v.display || v.value);\n    let out = `<div class=\"f ${!z && reasons.length ? kind : ''}\"><span class=\"lab\">${esc(LABEL[k] || k)}</span><span class=\"val\">${esc(shown) || '<span class=\"muted\">Not found</span>'}</span><span>${chip(label, kind)}</span><span class=\"src\" title=\"${esc(v.source_quote ? 'Source: “' + v.source_quote + '”' : 'No source text')}\" ${v.source_quote ? `onclick=\"window.flash && flash('${k}')\"` : ''}>${v.source_quote ? 'p' + (v.page || 1) + ' ↗' : 'none'}</span></div>`;\n    if (z) out += `<div class=\"why\" style=\"background:${C.subtle}\"><span class=\"muted small\">Resolved · ${esc(z.reason)}</span></div>`;\n    if (!z && v.note && !reasons.length) out += `<div class=\"why\" style=\"background:${C.subtle};padding:8px 14px\"><span class=\"small muted\">Note · ${esc(v.note)}</span></div>`;\n    if (!z && v.auto && !reasons.length) out += `<div class=\"why\" style=\"background:#EEF2FC;padding:8px 14px\"><span class=\"small\" style=\"color:#3C66CE\">AI auto-resolved · ${esc(v.auto)}${v.display && v.display !== v.value ? ' · printed as “' + esc(v.value) + '”' : ''}</span></div>`;\n    if (!z && reasons.length && !['approved'].includes(r.status)) {\n      const dates = k === 'invoice_date_raw' ? dateOpts(v.value) : [];\n      const isLaw = k === 'governing_law' || k === 'quebec_party';\n      out += `<div class=\"why ${kind}\">Why: ${esc(reasons.join(' · '))}<div class=\"acts\">\n        ${dates.length ? dates.map(([lbl, iso, why]) => `<button class=\"btn\" onclick='go(${js({ act: 'resolve', field: k, value: iso, reason: why })})'>${esc(lbl)}</button>`).join('')\n        : isLaw ? `<button class=\"btn\" onclick='go(${js({ act: 'exception', owner: 'Legal', reason: reasons[0] })})'>Escalate to Legal</button>\n           <select id=\"r_${k}\"><option>Approved by Legal</option><option>Client standard terms</option><option>French version on file</option></select><button class=\"btn\" onclick=\"go({act:'resolve',field:'${k}',reason:document.getElementById('r_${k}').value})\">Accept with reason</button>`\n        : `<input id=\"v_${k}\" value=\"${esc(v.value)}\" placeholder=\"Correct value\" style=\"width:200px\">\n           <select id=\"r_${k}\"><option>Verified on document</option><option>Corrected from document</option><option>Requested from supplier</option><option>Confirmed with supplier</option><option>Not a duplicate</option></select>\n           <button class=\"btn\" onclick=\"go({act:'resolve',field:'${k}',value:document.getElementById('v_${k}').value,reason:document.getElementById('r_${k}').value})\">Resolve</button>`}</div></div>`;\n    }\n    return out;\n  };\n  const title = isNda ? clean(r.supplier_or_party || 'NDA').replace(/;\\s*/, ' × ') : (f.supplier_name || {}).value || r.supplier_or_party || r.file_name;\n  const meta = r.route === 'manual' ? ['Not yet read by AI'] : isNda ? [docLabel(r), (f.nda_type || {}).value, r.language === 'fr' ? 'French' : 'English'] : [r.invoice_number, 'Invoice', (r.supplier_province || '') + ' supplier', (f.currency || {}).value || 'CAD'];\n  const headChip = r.status === 'approved' ? chip('✓ Approved', 'ok') : r.status === 'exception' ? chip('● Exception · ' + (r.owner || ''), 'warn') : open.length ? chip(`▲ ${open.length} ${isNda ? 'risk flag' : 'issue'}${open.length > 1 ? 's' : ''} to resolve`, 'bad') : chip('✓ Ready to approve', 'ok');\n  const marks = Object.entries(f).filter(([, v]) => v.source_quote).map(([k, v]) => ({ k, q: v.source_quote, c: res[k] ? 'ok' : (v.reasons || []).length ? (v.status === 'missing' ? 'bad' : 'warn') : 'ok' }));\n  const pdf = r.pdf && /pdf/.test(r.mime || 'application/pdf') ? `<div id=\"pages\" style=\"flex:1;overflow:auto\"></div><script type=\"application/json\" id=\"pdfdata\">${JSON.stringify({ b64: r.pdf, marks }).replace(/</g, '\\\\u003c')}</script>\n<script src=\"https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js\"></script>\n<script>(function () {\n  var D = JSON.parse(document.getElementById('pdfdata').textContent);\n  var host = document.getElementById('pages');\n  if (!window.pdfjsLib) { host.innerHTML = '<div class=\"empty\">Preview needs an internet connection to load PDF.js.</div>'; return; }\n  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';\n  var bytes = Uint8Array.from(atob(D.b64), function (c) { return c.charCodeAt(0); });\n  var COL = { ok: '#3C66CE', warn: '#E8A302', bad: '#B42318' };\n  var norm = function (s) { return String(s).toLowerCase().replace(/[^a-z0-9à-ÿ]/g, ''); };\n  window._boxes = {};\n  function drawPage(doc, n) {\n    return doc.getPage(n).then(function (pg) {\n      var w = host.clientWidth - 8;\n      var vp0 = pg.getViewport({ scale: 1 });\n      var vp = pg.getViewport({ scale: w / vp0.width });\n      var wrap = document.createElement('div');\n      wrap.style.cssText = 'position:relative;margin:0 auto 12px;width:' + vp.width + 'px;box-shadow:0 1px 3px rgba(0,0,72,.12);background:#fff';\n      var cv = document.createElement('canvas');\n      cv.width = vp.width * 2; cv.height = vp.height * 2;\n      cv.style.width = vp.width + 'px'; cv.style.display = 'block';\n      wrap.appendChild(cv); host.appendChild(wrap);\n      return pg.render({ canvasContext: cv.getContext('2d'), viewport: pg.getViewport({ scale: 2 * w / vp0.width }) }).promise\n        .then(function () { return pg.getTextContent(); })\n        .then(function (tc) {\n          tc.items.forEach(function (it) {\n            var s = norm(it.str);\n            if (s.length < 3) return;\n            D.marks.forEach(function (m) {\n              var q = norm(m.q);\n              if (!(q.indexOf(s) > -1 || (s.indexOf(q) > -1 && q.length > 3))) return;\n              var t = pdfjsLib.Util.transform(vp.transform, it.transform);\n              var h = Math.hypot(t[2], t[3]), x = t[4], y = t[5] - h, wd = it.width * vp.scale;\n              var b = document.createElement('div');\n              b.style.cssText = 'position:absolute;left:' + (x - 4) + 'px;top:' + (y - 3) + 'px;width:' + (wd + 8) + 'px;height:' + (h + 7) + 'px;border:2px solid ' + COL[m.c] + ';border-radius:4px;transition:background .3s';\n              wrap.appendChild(b);\n              (window._boxes[m.k] = window._boxes[m.k] || []).push(b);\n            });\n          });\n        });\n    });\n  }\n  window.flash = function (k) {\n    (window._boxes[k] || []).forEach(function (b, i) {\n      if (!i) b.scrollIntoView({ block: 'center', behavior: 'smooth' });\n      b.style.background = 'rgba(60,102,206,.25)';\n      setTimeout(function () { b.style.background = 'transparent'; }, 1200);\n    });\n  };\n  pdfjsLib.getDocument({ data: bytes, isEvalSupported: false }).promise.then(function (doc) {\n    var chain = Promise.resolve();\n    for (var i = 1; i <= doc.numPages; i++) (function (n) { chain = chain.then(function () { return drawPage(doc, n); }); })(i);\n    return chain;\n  }).catch(function (e) { host.innerHTML = '<div class=\"empty\">Preview failed: ' + e.message + '</div>'; });\n})();\n</script>`\n    : `<div class=\"empty\" style=\"flex:1\">Original not stored for this document.</div>`;\n  const audits = sd.audit.filter((e) => e.doc_id === r.doc_id);\n  return page(`<div class=\"top\"><a class=\"crumb\" href=\"${url({ view: 'queue' })}\">← Queue &nbsp;/&nbsp; ${esc(docLabel(r))}</a>\n    <span class=\"keys\">Keyboard: A approve · X exception</span><a class=\"btn\" href=\"${url({ view: 'doc', id: r.doc_id, audit: '1' })}\">Audit trail</a></div>\n  <div class=\"split\"><div class=\"docpane\"><span class=\"small muted\">${esc(r.file_name)} · Language detected: ${r.language === 'fr' ? 'French' : 'English'}</span>${pdf}</div>\n  <div class=\"panel\">${notice ? `<div class=\"notice\">${esc(notice)}</div>` : ''}<div class=\"ph\"><div><h2>${esc(title)}</h2><div class=\"muted\" style=\"margin-top:6px\">${meta.filter(Boolean).map(esc).join(' · ')}</div></div>${headChip}</div>\n    <p class=\"small muted\">Extracted by Gemini, validated by Canadian rules. Hover “p1 ↗” to see the exact source text.${r.language === 'fr' ? ' French document, fields shown in English.' : ''}</p>\n${r.route === 'manual' ? '<div class=\"why warn\" style=\"margin-top:16px\"><b>' + esc(r.why_it_needs_you) + '</b><div class=\"acts\">' + (r.pdf && !done ? '<button class=\"btn primary\" id=\"retry\" onclick=\"retryAI(this)\">Retry AI extraction</button>' : '') + '<span class=\"small muted\">Or send to exception and key the fields manually.</span></div></div><script>window.retryAI=function(btn){btn.disabled=true;btn.textContent=\\'Sending…\\';var d=JSON.parse(document.getElementById(\\'pdfdata\\').textContent);var b=Uint8Array.from(atob(d.b64),function(c){return c.charCodeAt(0)});var fd=new FormData();fd.append(\\'Document\\',new Blob([b],{type:\\'application/pdf\\'}),' + esc(JSON.stringify(r.file_name || 'document.pdf')).replace(/&quot;/g, '\"') + ');fetch(\\'/webhook/idp-upload\\',{method:\\'POST\\',body:fd,mode:\\'no-cors\\'}).then(function(){go({act:\\'exception\\',owner:\\'AI retry\\',reason:\\'Re-sent to pipeline\\'})})}</script>' : ''}\n    ${SECTIONS.map(([s, ks]) => { const rows = ks.map(fieldRow).join(''); return rows ? `<div class=\"sec\">${s}</div>${rows}` : ''; }).join('')}</div></div>\n  <div class=\"foot\">${done ? `${statusChip(r)}<button class=\"btn\" onclick=\"go({act:'reopen'})\">Reopen</button>`\n    : `<button id=\"exc\" class=\"btn\" onclick=\"go({act:'exception',owner:'AP Lead'})\">Send to exception (X)</button><span class=\"small muted\">${open.length ? `Resolve ${open.length} ${isNda ? 'risk flag' : 'issue'}${open.length > 1 ? 's' : ''} to approve` : 'All checks passed'}</span>\n       <button id=\"approve\" class=\"btn ${open.length ? 'dis' : 'primary'}\" ${open.length ? 'disabled' : ''} onclick=\"go({act:'approve'})\">Approve (A)</button>`}</div>\n  ${q.audit === '1' ? `<a class=\"scrim\" href=\"${url({ view: 'doc', id: r.doc_id })}\"></a><div class=\"drawer\"><div style=\"display:flex;justify-content:space-between\"><div><h2 style=\"margin:0\">Audit trail</h2><div class=\"muted small\" style=\"margin-top:6px\">${esc(r.invoice_number || r.doc_id)} · Append-only · Retain 6+ years</div></div><a class=\"btn\" href=\"${url({ view: 'doc', id: r.doc_id })}\">✕</a></div><div style=\"margin-top:24px\">${timeline(audits)}</div></div>` : ''}`, { title: r.invoice_number || 'Review' });\n}\n\nreturn [{ json: { html: renderApp(sd, q) } }];"
+      },
+      "name": "Build dashboard HTML",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        720
+      ]
+    },
+    {
+      "id": "65620246-6366-43e8-bdc9-822a0353d9b4",
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.html }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "name": "Respond with HTML",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        720
+      ]
+    },
+    {
+      "id": "04933854-147c-466c-ae7e-2bdeff7c6522",
+      "parameters": {
+        "content": "## 1 · Process a document\nUpload (reviewer UI or form) → Gemini reads twice → Canadian rules → stored in n8n.",
+        "width": 560,
+        "height": 160,
+        "color": 4
+      },
+      "name": "Note · Flow",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        120
+      ]
+    },
+    {
+      "id": "66584b31-871e-451f-834b-7bcdc04c9189",
+      "parameters": {
+        "content": "## 2 · Reviewer UI (Figma S1 to S5)\n**http://localhost:5678/webhook/idp-dashboard**\nUpload, review with PDF source highlights, resolve, approve, audit trail, ops.\nPublish the workflow first.",
+        "width": 600,
+        "height": 200,
+        "color": 6
+      },
+      "name": "Note · UI",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        720,
+        640
+      ]
+    }
+  ],
+  "connections": {
+    "Upload form": {
+      "main": [
+        [
+          {
+            "node": "Prepare request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload request": {
+      "main": [
+        [
+          {
+            "node": "Prepare request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare request": {
+      "main": [
+        [
+          {
+            "node": "Gemini · pass 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini · pass 1": {
+      "main": [
+        [
+          {
+            "node": "Gemini · pass 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini · pass 2": {
+      "main": [
+        [
+          {
+            "node": "Validate & route (Canadian rules)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate & route (Canadian rules)": {
+      "main": [
+        [
+          {
+            "node": "Store result + audit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dashboard request": {
+      "main": [
+        [
+          {
+            "node": "Build dashboard HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build dashboard HTML": {
+      "main": [
+        [
+          {
+            "node": "Respond with HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}
