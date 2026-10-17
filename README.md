@@ -1,12 +1,14 @@
 # Intelligent Document Processing for Canadian AP & Contracts
 
-**An AI product case study by S. Vikramkumar** · Concept project · Synthetic data only
+**An AI product case study by Vikram Seenivasan** · Concept project · Synthetic data only
 
 An AI-assisted review tool that reads vendor invoices and NDAs, checks them against Canadian tax and legal rules, and sends a person only the documents that need judgment. Built end to end: discovery, OOUX, wireframes, PRD, a working Gemini + n8n pipeline, and a reviewer UI.
 
-### ▶ [Try the live interactive demo](https://designervikram42-spec.github.io/idp-canada-ap-contracts/)
+### ▶ [Try the live interactive demo](https://vikram-pm.github.io/idp-canada-ap-contracts/)
 
 ![Document queue](assets/screenshots/01_queue.png)
+
+📄 **[Full end-to-end case study](docs/CASE_STUDY.md)**: flowchart, wireframes, prototype, usability test and UAT, KPIs, costs, pricing and ROI, enterprise path.
 
 > **Disclaimer:** Personal portfolio project. Not a Cognizant product, not built for or with Cognizant, and contains no Cognizant, client or supplier data. All companies, documents and numbers are fictional.
 

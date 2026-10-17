@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 640" font-family="Inter, Segoe UI, Arial, sans-serif" role="img" aria-label="End-to-end flowchart: upload, two AI reads, Canadian rules, auto-approve, review or manual, audit log">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#5A5F7A"/></marker></defs>
+<rect width="1200" height="640" fill="#FFFFFF"/>
+<g font-size="15" font-weight="600" fill="#000048" text-anchor="middle">
+<!-- row 1 -->
+<rect x="20" y="40" width="150" height="70" rx="12" fill="#FFFFFF" stroke="#000048" stroke-width="2"/><text x="95" y="70">Upload</text><text x="95" y="92" font-size="12" font-weight="400" fill="#5A5F7A">reviewer · PDF/PNG/JPG</text>
+<rect x="210" y="40" width="150" height="70" rx="12" fill="#EEF2FC" stroke="#3C66CE" stroke-width="2"/><text x="285" y="70">Prepare</text><text x="285" y="92" font-size="12" font-weight="400" fill="#5A5F7A">prompt + JSON schema</text>
+<rect x="400" y="40" width="150" height="70" rx="12" fill="#EEF2FC" stroke="#3C66CE" stroke-width="2"/><text x="475" y="70">AI read 1</text><text x="475" y="92" font-size="12" font-weight="400" fill="#5A5F7A">values + source quotes</text>
+<rect x="590" y="40" width="150" height="70" rx="12" fill="#EEF2FC" stroke="#3C66CE" stroke-width="2"/><text x="665" y="70">AI read 2</text><text x="665" y="92" font-size="12" font-weight="400" fill="#5A5F7A">independent check</text>
+<polygon points="860,20 960,75 860,130 760,75" fill="#FFF8E1" stroke="#E8A302" stroke-width="2"/><text x="860" y="72" font-size="14">AI</text><text x="860" y="90" font-size="14">answered?</text>
+<rect x="1010" y="40" width="170" height="70" rx="12" fill="#FEF0C7" stroke="#B54708" stroke-width="2"/><text x="1095" y="70">Manual queue</text><text x="1095" y="92" font-size="12" font-weight="400" fill="#5A5F7A">Retry AI · approve blocked</text>
+<!-- row 2 -->
+<rect x="775" y="210" width="170" height="70" rx="12" fill="#EEF2FC" stroke="#3C66CE" stroke-width="2"/><text x="860" y="240">Compare reads</text><text x="860" y="262" font-size="12" font-weight="400" fill="#5A5F7A">by meaning · auto-resolve</text>
+<rect x="555" y="210" width="170" height="70" rx="12" fill="#EEF2FC" stroke="#3C66CE" stroke-width="2"/><text x="640" y="240">Canadian rules</text><text x="640" y="262" font-size="12" font-weight="400" fill="#5A5F7A">QST · tax rate · totals · NDA</text>
+<polygon points="400,190 505,245 400,300 295,245" fill="#FFF8E1" stroke="#E8A302" stroke-width="2"/><text x="400" y="240" font-size="14">All critical</text><text x="400" y="258" font-size="14">verified?</text>
+<rect x="20" y="210" width="190" height="70" rx="12" fill="#E3F8E7" stroke="#1F7A45" stroke-width="2"/><text x="115" y="240">Auto-approve</text><text x="115" y="262" font-size="12" font-weight="400" fill="#5A5F7A">5% sampled for spot audit</text>
+<!-- row 3 -->
+<rect x="315" y="380" width="170" height="70" rx="12" fill="#FEE4E2" stroke="#B42318" stroke-width="2"/><text x="400" y="410">Review queue</text><text x="400" y="432" font-size="12" font-weight="400" fill="#5A5F7A">sorted by risk</text>
+<rect x="545" y="380" width="200" height="70" rx="12" fill="#FFFFFF" stroke="#000048" stroke-width="2"/><text x="645" y="410">Reviewer</text><text x="645" y="432" font-size="12" font-weight="400" fill="#5A5F7A">source on PDF · resolve with reason</text>
+<rect x="810" y="350" width="170" height="60" rx="12" fill="#E3F8E7" stroke="#1F7A45" stroke-width="2"/><text x="895" y="377">Approve</text><text x="895" y="397" font-size="12" font-weight="400" fill="#5A5F7A">only when 0 issues</text>
+<rect x="810" y="425" width="170" height="60" rx="12" fill="#FEF0C7" stroke="#B54708" stroke-width="2"/><text x="895" y="452">Exception</text><text x="895" y="472" font-size="12" font-weight="400" fill="#5A5F7A">owner: AP lead / Legal</text>
+<!-- audit -->
+<rect x="20" y="545" width="1160" height="60" rx="12" fill="#000048"/><text x="600" y="571" fill="#FFFFFF">Audit log (append-only)</text><text x="600" y="592" font-size="12" font-weight="400" fill="#AEB6D9">every AI and human action · before / after · reason · timestamp · kept 6+ years</text>
+</g>
+<g stroke="#5A5F7A" stroke-width="2" fill="none" marker-end="url(#a)">
+<path d="M170,75H208"/><path d="M360,75H398"/><path d="M550,75H588"/><path d="M740,75H758"/>
+<path d="M960,75H1008"/><path d="M860,130V208"/><path d="M775,245H727"/><path d="M555,245H507"/>
+<path d="M295,245H212"/><path d="M400,300V378"/><path d="M485,415H543"/>
+<path d="M745,405L808,382"/><path d="M745,425L808,452"/>
+<path d="M1095,110V250H947" stroke-dasharray="6 5"/>
+</g>
+<g font-size="13" font-weight="600" fill="#5A5F7A"><text x="975" y="66">no</text><text x="868" y="175">yes</text><text x="250" y="236">yes</text><text x="408" y="345">no</text><text x="1005" y="238">Retry AI</text></g>
+</svg>

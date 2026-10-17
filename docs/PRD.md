@@ -1,6 +1,6 @@
 # PRD · Intelligent Document Processing (v0.2)
 
-**Author:** S. Vikramkumar · **Status:** prototype complete, synthetic data · **Changes since v0.1:** see [DECISIONS.md](DECISIONS.md)
+**Author:** Vikram Seenivasan · **Status:** prototype complete, synthetic data · **Changes since v0.1:** see [DECISIONS.md](DECISIONS.md)
 
 ## Problem
 Back-office teams rekey 15+ fields per invoice and read every NDA end to end. Errors cost money (missed input tax credits, duplicate payments, late discovery of risky NDA terms). Canada adds four tax regimes, bilingual documents and provincial law.
