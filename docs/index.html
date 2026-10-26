@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IDP for Canadian AP &amp; Contracts · AI Product Case Study · Vikram Seenivasan</title>
+<meta name="description" content="AI product case study by Vikram Seenivasan: an AI reviewer for Canadian invoices and NDAs, from discovery to a working product, with a live demo.">
+<meta property="og:title" content="IDP for Canadian AP & Contracts · AI Product Case Study">
+<meta property="og:image" content="assets/02_invoice_review.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--navy:#0E1236;--ink:#151833;--muted:#5C6178;--light:#F3F5F9;--paper:#FCFCFD;--accent:#3C66CE;--accent2:#8FA8F0;--line:#E1E5EE;--ok:#1F7A45;--bad:#B42318;--warn:#B54708}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font-family:Inter,"Segoe UI",system-ui,Arial,sans-serif;color:var(--ink);background:var(--paper);font-size:18px;line-height:1.55}
+a{color:var(--accent)}img{max-width:100%;display:block}
+.wrap{max-width:1160px;margin:0 auto;padding:0 32px}
+nav.top{position:sticky;top:0;z-index:50;background:rgba(252,252,253,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+nav.top .wrap{display:flex;align-items:center;justify-content:space-between;height:64px}
+nav.top b{font-size:16px}.links{display:flex;gap:24px;font-size:15px;font-weight:600}.links a{color:var(--ink);text-decoration:none;white-space:nowrap}.links a:hover{color:var(--accent)}
+.eyebrow{font-size:13px;font-weight:700;letter-spacing:2px;color:var(--accent);text-transform:uppercase;margin:0}
+h1{font-size:44px;line-height:1.1;margin:16px 0 20px;letter-spacing:-.5px}h2{font-size:38px;line-height:1.15;margin:10px 0 32px;letter-spacing:-.3px}h3{font-size:20px;margin:0 0 6px}
+p{margin:0}.muted{color:var(--muted)}
+section{padding:96px 0}section.alt{background:var(--light)}
+.hero{background:var(--navy);color:#F3F5FA;padding:96px 0 104px}.hero .eyebrow{color:var(--accent2)}
+.hero-grid{display:grid;grid-template-columns:1.05fr 1fr;gap:56px;align-items:center}
+.hero p.lead{font-size:20px;color:#C9CEE6;max-width:560px}
+.shot{background:#fff;border-radius:16px;padding:10px;box-shadow:0 24px 60px rgba(0,0,0,.35)}
+.btns{display:flex;gap:12px;margin-top:32px;flex-wrap:wrap}
+.btn{display:inline-block;padding:13px 22px;border-radius:10px;font-weight:600;font-size:15px;text-decoration:none;border:1px solid transparent;cursor:pointer;font-family:inherit}
+.btn.light{background:#fff;color:var(--navy)}.btn.ghost{border-color:#4A5190;color:#fff;background:transparent}.btn.dark{background:var(--navy);color:#fff}
+.meta{display:flex;gap:40px;margin-top:40px;font-size:14px;color:#C9CEE6}.meta b{display:block;color:#fff;font-size:15px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:start}
+.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:28px}
+.big{font-size:44px;font-weight:700;color:var(--accent);line-height:1.1;margin-bottom:6px}
+.hmw{font-size:22px;margin-top:32px}
+.persona{border-left:4px solid var(--accent);padding-left:18px;margin-bottom:22px}
+.insight{background:var(--navy);color:#F3F5FA;border-radius:16px;padding:36px}.insight .eyebrow{color:var(--accent2)}.insight p.q{font-size:24px;font-weight:600;line-height:1.35;margin:12px 0}
+.split{display:grid;grid-template-columns:1.6fr 1fr;gap:48px;align-items:start}
+.figure{background:#fff;border:1px solid var(--line);border-radius:16px;padding:12px}
+.point{margin-bottom:24px}.point .n{font-size:13px;font-weight:700;color:var(--accent)}
+.strip{display:flex;gap:40px;flex-wrap:wrap;background:var(--light);border-radius:12px;padding:20px 28px;margin-top:24px;font-size:17px}
+table{border-collapse:collapse;width:100%}th{text-align:left;font-size:13px;font-weight:600;color:var(--muted);padding:10px 12px 10px 0;text-transform:uppercase;letter-spacing:.5px}td{padding:14px 12px 14px 0;border-top:1px solid var(--line);vertical-align:top}td.r,th.r{text-align:right}
+.stat{background:var(--navy);color:#F3F5FA;border-radius:16px;padding:36px}.stat .n{font-size:64px;font-weight:700;line-height:1}
+/* demo */
+#demo{background:var(--navy);color:#F3F5FA}#demo .eyebrow{color:var(--accent2)}#demo .wrap{max-width:1400px}#demo .muted{color:#C9CEE6}
+.pipe{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin:28px 0 16px}
+.pipe div{border:1px solid #2A2F6A;border-radius:10px;padding:12px;font-size:13px;color:#AEB4D6;text-align:center;transition:all .25s}.pipe div b{display:block;color:#fff;font-size:14px}
+.pipe div[data-state=active]{background:var(--accent);border-color:var(--accent);color:#fff}.pipe div[data-state=done]{background:#161B4D;border-color:var(--accent)}
+.pipe div[data-state=ok]{background:var(--ok);border-color:var(--ok);color:#fff}.pipe div[data-state=flag]{background:var(--bad);border-color:var(--bad);color:#fff}.pipe div[data-state=warn]{background:var(--warn);border-color:var(--warn);color:#fff}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.chipbtn{background:#161B4D;color:#fff;border:1px solid #333A80;border-radius:20px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}.chipbtn:hover{background:var(--accent);border-color:var(--accent)}
+#runlog{min-height:26px;font-size:15px;color:#C9CEE6;margin:4px 0 16px}
+.browser{background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.45)}.bar{background:#ECEEF5;height:38px;display:flex;align-items:center;gap:8px;padding:0 14px}.bar i{width:11px;height:11px;border-radius:50%;background:#C9CDDB;display:inline-block}.bar .url{flex:1;margin-left:10px;background:#fff;border-radius:6px;height:22px;font-size:12px;color:var(--muted);display:flex;align-items:center;padding:0 10px}
+.scroller{overflow-x:auto}#app{width:100%;min-width:1240px;height:800px;border:0;display:block;background:#fff}
+.note{font-size:14px;color:#AEB4D6;margin-top:16px}
+footer{padding:40px 0;color:var(--muted);font-size:14px;border-top:1px solid var(--line)}
+@media (max-width:900px){h1{font-size:36px}h2{font-size:30px}.hero-grid,.grid3,.grid2,.split{grid-template-columns:1fr}.links{display:none}.pipe{grid-template-columns:repeat(3,1fr)}}
+</style>
+</head>
+<body>
+<nav class="top"><div class="wrap"><b>Vikram Seenivasan</b>
+<div class="links"><a href="#problem">Problem</a><a href="#solution">Solution</a><a href="#demo">Live demo</a><a href="#ai">AI approach</a><a href="#evaluation">Evaluation</a><a href="#security">Security &amp; cost</a><a href="#business">Business case</a><a href="https://github.com/vikram-pm/idp-canada-ap-contracts">GitHub</a></div></div></nav>
+
+<header class="hero"><div class="wrap hero-grid">
+<div><p class="eyebrow">AI product case study</p>
+<h1>Intelligent document processing for Canadian AP &amp; Contracts</h1>
+<p class="lead">An AI reviewer that reads invoices and NDAs, applies Canadian tax and legal rules, and sends people only what needs judgment.</p>
+<div class="btns"><a class="btn light" href="#video">Watch the demo (90 sec)</a><a class="btn ghost" href="#demo">Try it live</a><a class="btn ghost" href="https://github.com/vikram-pm/idp-canada-ap-contracts/blob/main/docs/CASE_STUDY.md">Read the full case study</a></div>
+<div class="meta"><div><b>Role</b>Product manager &amp; designer</div><div><b>Scope</b>Discovery → design → build → test</div><div><b>Stack</b>Figma · n8n · Gemini · Microsoft path</div></div></div>
+<div class="shot"><img src="assets/02_invoice_review.png" alt="Invoice review screen: PDF with outlined source text beside verified fields"></div>
+</div></header>
+
+<section id="video" style="padding:72px 0"><div class="wrap">
+<p class="eyebrow">Product demo</p><h2>See it work end to end in 90 seconds</h2>
+<p class="muted" style="max-width:820px;margin-bottom:24px">The full reviewer interaction: upload, two AI reads and Canadian rules, evidence on the PDF, resolving an issue, approval, audit trail, a batch upload and the ops dashboard. Recorded from the real interface, with subtitles.</p>
+<div class="figure"><video controls playsinline preload="metadata" poster="assets/demo-poster.jpg" style="width:100%;display:block;border-radius:8px"><source src="assets/demo.mp4" type="video/mp4">Your browser can't play this video. <a href="assets/demo.mp4">Download the demo video</a>.</video></div>
+</div></section>
+<section id="problem"><div class="wrap">
+<p class="eyebrow">02 · Problem</p><h2>Manual review is slow, and small errors are costly</h2>
+<div class="grid3">
+<div class="card"><div class="big">~9 min</div><h3>per invoice today</h3><p class="muted">15+ fields rekeyed by hand (baseline to validate)</p></div>
+<div class="card"><div class="big">4</div><h3>sales-tax regimes</h3><p class="muted">GST, HST, QST and PST, set by place of supply</p></div>
+<div class="card"><div class="big">EN / FR</div><h3>bilingual documents</h3><p class="muted">French formats and provincial governing law</p></div>
+</div>
+<p class="hmw"><b>How might we</b> let AI handle the routine reading, so people only make the judgment calls?</p>
+</div></section>
+
+<section id="users" class="alt"><div class="wrap">
+<p class="eyebrow">03 · Users</p><h2>Built for the people who check every document</h2>
+<div class="grid2">
+<div><div class="persona"><h3>AP analyst · primary</h3><p class="muted">Clears the daily invoice queue fast and correctly</p></div>
+<div class="persona"><h3>Contracts reviewer</h3><p class="muted">Triages NDAs and catches risky clauses</p></div>
+<div class="persona"><h3>Finance controller</h3><p class="muted">Needs a clean close and full tax-credit recovery</p></div></div>
+<div class="insight"><p class="eyebrow">Key insight</p><p class="q">The value isn't faster typing. It's a reviewer who only sees documents that need a decision, with the evidence in front of them.</p><p style="font-size:15px;color:#C9CEE6">From personas, journey maps and an OOUX model</p></div>
+</div></div></section>
+
+<section id="solution"><div class="wrap">
+<p class="eyebrow">04 · Solution</p><h2>Review only what needs judgment</h2>
+<div class="split"><div class="figure"><img src="assets/02_invoice_review.png" alt="Invoice review with source highlights"></div>
+<div><div class="point"><p class="n">01</p><h3>Evidence on the PDF</h3><p class="muted">Every value is outlined where the AI read it.</p></div>
+<div class="point"><p class="n">02</p><h3>Small things auto-resolved</h3><p class="muted">"Quebec" = "QC"; dates shown as Mar 4, 2026.</p></div>
+<div class="point"><p class="n">03</p><h3>Approve only when clear</h3><p class="muted">Blocked until every real issue is resolved.</p></div></div></div>
+</div></section>
+
+<section id="flow" class="alt"><div class="wrap">
+<p class="eyebrow">05 · How it works</p><h2>One flow, three outcomes</h2>
+<div class="split"><div class="figure"><img src="assets/flowchart.svg" alt="Flowchart: upload, two AI reads, Canadian rules, then auto-approve, review or manual, all logged"></div>
+<div><div class="point"><h3>Auto-approve</h3><p class="muted">All checks pass; 5% spot-audited</p></div><div class="point"><h3>Review</h3><p class="muted">A person resolves real issues</p></div><div class="point"><h3>Manual</h3><p class="muted">AI unavailable; one-click retry</p></div><div class="point"><h3>Audit log</h3><p class="muted">Every AI and human action</p></div></div></div>
+</div></section>
+
+<section id="design"><div class="wrap">
+<p class="eyebrow">06 · Design</p><h2>Designed in Figma, built as a working product</h2>
+<div class="grid2">
+<figure style="margin:0"><div class="figure"><img src="assets/01_queue.png" alt="Document queue screen"></div><p class="muted" style="margin-top:10px;font-size:15px"><b style="color:var(--ink)">Queue</b> · sorted by risk, reason in plain words</p></figure>
+<figure style="margin:0"><div class="figure"><img src="assets/03_nda_review.png" alt="NDA review screen"></div><p class="muted" style="margin-top:10px;font-size:15px"><b style="color:var(--ink)">NDA review</b> · same pattern, Canadian legal playbook</p></figure>
+<figure style="margin:0"><div class="figure"><img src="assets/05_audit_trail.png" alt="Audit trail drawer"></div><p class="muted" style="margin-top:10px;font-size:15px"><b style="color:var(--ink)">Audit trail</b> · every AI and human action</p></figure>
+<figure style="margin:0"><div class="figure"><img src="assets/06_ops_dashboard.png" alt="Ops dashboard screen"></div><p class="muted" style="margin-top:10px;font-size:15px"><b style="color:var(--ink)">Ops dashboard</b> · KPIs against targets</p></figure>
+</div></div></section>
+
+<section id="demo"><div class="wrap">
+<p class="eyebrow">Live demo</p><h2 style="color:#fff;margin-bottom:12px">Try the product</h2>
+<p class="muted">Process a sample document, open it, resolve the issue and approve it. This is the real interface and rules engine, running in your browser.</p>
+<div class="pipe"><div data-step="upload"><b>Upload</b>PDF received</div><div data-step="prepare"><b>Prepare</b>Prompt + schema</div><div data-step="read1"><b>AI read 1</b>Values + source</div><div data-step="read2"><b>AI read 2</b>Independent check</div><div data-step="rules"><b>Rules</b>Canadian tax &amp; legal</div><div data-step="route"><b>Route</b>Approve · review · manual</div></div>
+<div class="controls" id="samples"></div>
+<div class="controls"><button class="btn light" onclick="demoAll()">Process all 8 samples</button><button class="btn ghost" onclick="demoReset()">Reset</button><span id="livestats" style="font-size:14px;color:#AEB4D6;margin-left:8px"></span></div>
+<div id="runlog">Pick a sample document above, or click Upload documents inside the app.</div>
+<div class="browser"><div class="bar"><i></i><i></i><i></i><div class="url">reviewer interface</div></div><div class="scroller"><iframe id="app" title="IDP reviewer interface demo"></iframe></div></div>
+<p class="note">AI responses for the 8 samples are recorded, because a public site can't hold an API key. Your own uploads go to Manual, which shows the failure path. The full version runs on n8n with live AI calls.</p>
+</div></section>
+
+<section id="ai"><div class="wrap">
+<p class="eyebrow">07 · AI approach</p><h2>AI confidence is earned with evidence</h2>
+<div class="grid3">
+<div class="card"><div class="big">1</div><h3>Grounded</h3><p class="muted">The model quotes the exact text it read. No quote, no value.</p></div>
+<div class="card"><div class="big">2</div><h3>Consistent</h3><p class="muted">A second, independent read must agree, compared by meaning.</p></div>
+<div class="card"><div class="big">3</div><h3>Valid</h3><p class="muted">Deterministic Canadian rules decide validity. The model only reads.</p></div>
+</div>
+<p class="muted" style="margin-top:20px;font-size:15px">Architecture today: the AI reads each document directly (no RAG), and results are stored in n8n's own storage (no separate database). RAG is planned only for the NDA playbook.</p>
+<div class="strip"><span><b>Not verified</b> → a person</span><span><b>NDAs</b> → always a person (pilot)</span><span><b>AI outage</b> → Manual with retry</span></div>
+</div></section>
+
+<section id="model" class="alt"><div class="wrap">
+<p class="eyebrow">08 · Model fit and cost</p><h2>Right model for each job, about 2¢ per document</h2>
+<table><tr><th>Model</th><th>Role</th><th class="r">Cost / doc (USD)</th><th>Data in Canada</th></tr>
+<tr><td><b>Gemini 2.5 Flash-Lite</b></td><td>Prototype: both reads</td><td class="r">$0.0009</td><td style="color:var(--warn)">No (free tier)</td></tr>
+<tr><td><b>Azure AI Document Intelligence</b></td><td>Production read 1: invoices</td><td class="r">$0.015</td><td style="color:var(--ok)">Yes (Canada region)</td></tr>
+<tr><td><b>Azure OpenAI GPT-4.1-mini</b></td><td>Production read 2 + NDAs</td><td class="r">$0.0017</td><td style="color:var(--ok)">Yes (regional deployment)</td></tr></table>
+<div class="grid2" style="margin-top:28px"><div class="card"><h3>Why two different models</h3><p class="muted">Independent models make different mistakes, so they rarely agree on the same wrong value.</p></div><div class="card"><h3>How I would choose</h3><p class="muted">Bake-off on ~200 real documents, ranked by false negatives first, then accuracy, latency and cost.</p></div></div>
+</div></section>
+<section id="validation"><div class="wrap">
+<p class="eyebrow">09 · Validation</p><h2>Tested against requirements, then improved</h2>
+<div class="grid2" style="grid-template-columns:340px 1fr">
+<div class="stat"><div class="n">8/8</div><p style="color:#C9CEE6;margin-top:10px">acceptance scenarios passed on the test pack: 3 auto-approved, 5 to review for a real reason</p></div>
+<table><tr><th>What testing found</th><th>What changed</th></tr>
+<tr><td>Two reads differed only in format</td><td><b>Compare by meaning; auto-resolve and explain</b></td></tr>
+<tr><td>AI outages made documents vanish</td><td><b>Route to Manual with retry; block approval</b></td></tr>
+<tr><td>Page refresh overwrote new results</td><td><b>Read-only views; only actions write</b></td></tr>
+<tr><td>Planted errors slipped through</td><td><b>New currency, date and NDA guardrails</b></td></tr></table>
+</div></div></section>
+
+<section id="evaluation" class="alt"><div class="wrap">
+<p class="eyebrow">10 · Evaluation</p><h2>Testing for false negatives: errors that slip through</h2>
+<p class="muted" style="max-width:820px;margin-bottom:28px">The dangerous error is a wrong document that gets auto-approved. I planted 16 errors where both AI reads agree on the wrong value, the hardest case to catch.</p>
+<div class="grid2" style="grid-template-columns:340px 1fr">
+<div class="stat"><div class="n">9/16</div><p style="color:#C9CEE6;margin-top:10px">planted errors caught, up from 7/16 after adding currency, date and NDA guardrails</p></div>
+<table><tr><th>Error type</th><th>Result</th><th>Next guardrail</th></tr>
+<tr><td>Amounts, tax rate, provinces</td><td style="color:var(--ok)"><b>Caught by rules</b></td><td>—</td></tr>
+<tr><td>Currency, NDA governing law</td><td style="color:var(--ok)"><b>Caught by new guardrails</b></td><td>—</td></tr>
+<tr><td>Dates in a normal range</td><td style="color:var(--warn)"><b>Missed</b></td><td>Verify quote against PDF text</td></tr>
+<tr><td>Supplier name, GST/HST number</td><td style="color:var(--warn)"><b>Missed</b></td><td>Match to vendor master</td></tr>
+<tr><td>Invoice and PO numbers</td><td style="color:var(--warn)"><b>Missed</b></td><td>Match to PO / ERP</td></tr></table></div>
+</div></section>
+
+<section id="guardrails"><div class="wrap">
+<p class="eyebrow">11 · Guardrails</p><h2>Technical and operational guardrails</h2>
+<div class="grid2">
+<div><h3 style="margin-bottom:8px">Technical</h3><table>
+<tr><td>Schema-only output, source quote required</td><td class="r" style="color:var(--ok)"><b>Built</b></td></tr>
+<tr><td>Two independent reads, deterministic rules</td><td class="r" style="color:var(--ok)"><b>Built</b></td></tr>
+<tr><td>Currency, date and NDA guardrails</td><td class="r" style="color:var(--ok)"><b>Built</b></td></tr>
+<tr><td>Approve locked until issues resolved</td><td class="r" style="color:var(--ok)"><b>Built</b></td></tr>
+<tr><td>Document text treated as data; model has no tools</td><td class="r" style="color:var(--ok)"><b>Built</b></td></tr>
+<tr><td>Quote verification, vendor and PO matching</td><td class="r" style="color:var(--warn)"><b>Planned</b></td></tr>
+<tr><td>Bank-detail redaction before the model call</td><td class="r" style="color:var(--warn)"><b>Planned</b></td></tr></table></div>
+<div><h3 style="margin-bottom:8px">Operational</h3><table>
+<tr><td>5% spot audit of auto-approved documents</td><td class="r" style="color:var(--ok)"><b>Built</b></td></tr>
+<tr><td>Reason code on every correction</td><td class="r" style="color:var(--ok)"><b>Built</b></td></tr>
+<tr><td>Append-only audit trail</td><td class="r" style="color:var(--ok)"><b>Built</b></td></tr>
+<tr><td>Weekly review of misses and overrides</td><td class="r" style="color:var(--warn)"><b>Planned</b></td></tr>
+<tr><td>No model change without passing the eval</td><td class="r" style="color:var(--warn)"><b>Planned</b></td></tr>
+<tr><td>Tax team signs off the rules</td><td class="r" style="color:var(--warn)"><b>Planned</b></td></tr>
+<tr><td>Segregation of duties above a threshold</td><td class="r" style="color:var(--warn)"><b>Planned</b></td></tr></table></div>
+</div></div></section>
+<section id="security" class="alt"><div class="wrap">
+<p class="eyebrow">12 · Security and Azure cost</p><h2>Secure by design on Azure, about $1.1K a month at 10K documents</h2>
+<div class="grid2">
+<div><h3 style="margin-bottom:12px">Security controls</h3>
+<div class="persona"><p>Data stays in Canada (Canada Central / East)</p></div><div class="persona"><p>Entra ID single sign-on, roles from the CTA matrix</p></div><div class="persona"><p>Private endpoints, no public access; secrets in Key Vault</p></div><div class="persona"><p>Encrypted at rest and in transit</p></div><div class="persona"><p>Azure OpenAI does not train on customer data</p></div><div class="persona"><p>Immutable storage, 7-year retention for CRA; Law 25 privacy assessment before real data</p></div></div>
+<div><h3 style="margin-bottom:8px">Azure cost per month (CAD)</h3><table><tr><th>Docs / month</th><th class="r">AI</th><th class="r">Platform</th><th class="r">Total</th></tr><tr><td><b>2,000</b></td><td class="r">$46</td><td class="r">$411</td><td class="r"><b>$457</b></td></tr><tr><td><b>10,000</b></td><td class="r">$229</td><td class="r">$863</td><td class="r"><b>$1,092</b></td></tr><tr><td><b>50,000</b></td><td class="r">$1,145</td><td class="r">$2,000</td><td class="r"><b>$3,145</b></td></tr></table>
+<p class="muted" style="font-size:15px;margin-top:12px">Platform: App Service, database, storage, Key Vault, private endpoints, monitoring. Add ~$100 a month if NDA playbook search (Azure AI Search) is used. List prices, Oct 2026, US$1 = CAD $1.37.</p></div>
+</div></div></section>
+<section id="business"><div class="wrap">
+<p class="eyebrow">13 · Business case</p><h2>AI is cheap; volume decides the business case</h2>
+<div class="grid2">
+<div><h3 style="margin-bottom:8px">KPI targets</h3><table>
+<tr><td>Straight-through rate (invoices)</td><td class="r"><b>40–60%</b></td></tr><tr><td>Field-level accuracy</td><td class="r"><b>≥ 95%</b></td></tr><tr><td>Handle time per document</td><td class="r"><b>−30%</b></td></tr><tr><td>Missed-issue rate (false negatives)</td><td class="r"><b>&lt; 1%</b></td></tr></table></div>
+<div><h3 style="margin-bottom:8px">ROI by volume (CAD, modelled)</h3><table>
+<tr><th>Docs / month</th><th class="r">Net / year</th><th class="r">Payback</th></tr><tr><td><b>2,000</b></td><td class="r"><b>$70K</b></td><td class="r">36 mo</td></tr><tr><td><b>10,000</b></td><td class="r"><b>$366K</b></td><td class="r">5 mo</td></tr><tr><td><b>50,000</b></td><td class="r"><b>$1.86M</b></td><td class="r">1 mo</td></tr></table>
+<p class="muted" style="font-size:15px;margin-top:12px">AI ≈ 2¢ per document. Build ≈ $132K to a pilot. Re-checked Oct 2026 with Azure list prices. <a href="https://github.com/vikram-pm/idp-canada-ap-contracts/blob/main/docs/CASE_STUDY.md#10-business-case-cad">Assumptions and pricing</a></p></div>
+</div></div></section>
+
+<section id="opportunities" class="alt"><div class="wrap">
+<p class="eyebrow">14 · AI opportunities</p><h2>Where AI adds value next in AP and contracts</h2>
+<table><tr><th>Opportunity</th><th>Value</th><th class="r">Status</th></tr>
+<tr><td>Invoice and NDA extraction with validation</td><td><b>High</b></td><td class="r" style="color:var(--ok)"><b>Built</b></td></tr>
+<tr><td>Draft vendor emails for missing details (e.g. QST number)</td><td><b>Medium</b></td><td class="r" style="color:var(--ok)"><b>Quick win</b></td></tr>
+<tr><td>GL coding suggestions from invoice lines</td><td><b>High</b></td><td class="r"><b>Next</b></td></tr>
+<tr><td>Fraud signals: bank-detail changes, near-duplicates</td><td><b>High</b></td><td class="r"><b>Next</b></td></tr>
+<tr><td>NDA clause check against the legal playbook (RAG)</td><td><b>Medium</b></td><td class="r"><b>Later</b></td></tr>
+<tr><td>Ask the queue in Teams with Microsoft Copilot</td><td><b>Medium</b></td><td class="r"><b>Later</b></td></tr></table>
+</div></section>
+<section id="next"><div class="wrap">
+<p class="eyebrow">15 · Next</p><h2>Close the gaps, validate, then pilot</h2>
+<div class="grid3">
+<div class="card"><h3>Close gaps</h3><p class="muted">Quote verification, vendor and PO matching</p></div>
+<div class="card"><h3>Validate</h3><p class="muted">Model bake-off on real documents; usability with AP reviewers</p></div>
+<div class="card"><h3>Pilot</h3><p class="muted">Azure, Canada region, 10,000+ documents a month</p></div>
+</div>
+<div class="btns"><a class="btn dark" href="https://github.com/vikram-pm/idp-canada-ap-contracts/blob/main/docs/CASE_STUDY.md">Full case study</a><a class="btn" style="border-color:var(--line);color:var(--ink)" href="https://github.com/vikram-pm/idp-canada-ap-contracts">Code on GitHub</a></div>
+</div></section>
+
+<footer><div class="wrap">© 2026 Vikram Seenivasan · <a href="https://github.com/vikram-pm">github.com/vikram-pm</a> · Personal concept project · synthetic data · not built for any employer</div></footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="demo/engine.js"></script>
+<script src="demo/demo.js"></script>
+</body>
+</html>
