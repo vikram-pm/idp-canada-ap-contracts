@@ -10,7 +10,7 @@ function renderApp(sd, q) {
   const clean = (t) => String(t || '').replace(/\s*\((TEST ENTITY|ENTITE TEST)\)/gi, '');
   const short = (m, k) => { const R = [[/QST charged but no QST/, 'Missing QST number'], [/GST\/HST charged but no/, 'Missing GST/HST number'], [/not in the .* format/, 'Invalid tax number'], [/QST charged but place/, 'QST outside Quebec'], [/Expected (HST|GST|QST)/, 'Tax rate mismatch'], [/Subtotal \+ taxes/, "Totals don't add up"], [/Ambiguous date/, 'Ambiguous date'], [/duplicate/i, 'Possible duplicate'], [/Non-Canadian governing law/, 'Non-Canadian governing law'], [/Quebec party/, 'Quebec party: French version?'], [/disagree/, 'Two reads disagree'], [/privacy clause/i, 'No privacy clause']]; for (const [re, l] of R) if (re.test(m)) return l; return /not found/.test(m) ? 'Missing ' + String(k).replace(/_raw$/, '').replace(/_/g, ' ') : m.slice(0, 40); };
   const docLabel = (r) => r.invoice_number || (String(r.file_name).match(/NDA-\d+/) || [r.doc_type === 'nda' ? 'NDA' : r.doc_id])[0];
-  const party = (r) => r.doc_type === 'nda' ? (clean(r.supplier_or_party).split(/;\s*/).find((x) => !/cognizant/i.test(x)) || clean(r.supplier_or_party)) : clean(r.supplier_or_party);
+  const party = (r) => r.doc_type === 'nda' ? (clean(r.supplier_or_party).split(/;\s*/).find((x) => !/acme canada/i.test(x)) || clean(r.supplier_or_party)) : clean(r.supplier_or_party);
   const log = (r, event, detail) => sd.audit.unshift({ timestamp: now(), doc_id: r.doc_id, file_name: r.file_name, actor_type: 'Human', actor: 'Demo reviewer', event, detail: detail || '' });
 
   // ---------- actions ----------
@@ -56,7 +56,7 @@ function renderApp(sd, q) {
   const url = (p) => '?' + Object.entries(p).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => k + '=' + encodeURIComponent(v)).join('&');
   const NAV = [['queue', 'Document queue'], ['exceptions', 'Exceptions'], ['suppliers', 'Suppliers'], ['audit', 'Audit log'], ['ops', 'Ops dashboard']];
   const shell = (active, body, opts = {}) => page(`
-    <aside class="nav"><div class="brand">IDP · AP &amp; Contracts</div><div class="brandsub">Cognizant Canada (internal)</div>
+    <aside class="nav"><div class="brand">IDP · AP &amp; Contracts</div><div class="brandsub">Concept · synthetic data</div>
       ${NAV.map(([k, l]) => `<a class="navi ${k === active ? 'on' : ''}" href="${url({ view: k })}">${l}</a>`).join('')}
       <div class="navfoot">Synthetic data only</div></aside>
     <main class="main">${notice ? `<div class="notice">${esc(notice)}</div>` : ''}${body}</main>`, opts);

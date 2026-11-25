@@ -10,7 +10,7 @@ An AI-assisted review tool that reads vendor invoices and NDAs, checks them agai
 
 📄 **[Full end-to-end case study](docs/CASE_STUDY.md)**: flowchart, wireframes, prototype, usability test and UAT, KPIs, costs, pricing and ROI, enterprise path.
 
-> **Disclaimer:** Personal portfolio project. Not a Cognizant product, not built for or with Cognizant, and contains no Cognizant, client or supplier data. All companies, documents and numbers are fictional.
+> **Disclaimer:** Personal portfolio project. Not an employer product, not built for or with any employer or client, and contains no employer, client or supplier data. All companies, documents and numbers are fictional.
 
 ---
 

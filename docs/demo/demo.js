@@ -23,8 +23,7 @@
       .split('location.reload()},20000)').join('location.reload()},3500)')
       .split('location.reload()').join('parent.demoNav(window.__q)')
       .split("fetch('/webhook/idp-upload',").join('parent.demoUpload(')
-      .split('var left=k<Q.length-1?22:0').join('var left=k<Q.length-1?3:0')
-      .split('Cognizant Canada (internal)').join('Concept · synthetic data');
+      .split('var left=k<Q.length-1?22:0').join('var left=k<Q.length-1?3:0');
     var inject = '<script>window.__q=' + JSON.stringify(qs) + ';' +
       "document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[href^=\"?\"]');if(a&&!e.defaultPrevented){e.preventDefault();parent.demoNav(a.getAttribute('href'))}});</script>";
     return html.replace('</body>', inject + '</body>');

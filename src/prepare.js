@@ -53,7 +53,7 @@ const schema = {
   required: ['doc_type', 'language', 'fields'],
 };
 
-const instructions = `You extract data for Cognizant Canada Accounts Payable and Contracts.
+const instructions = `You extract data for Acme Canada Accounts Payable and Contracts.
 The attached document may be in English or French.
 
 1. Classify doc_type: "invoice" (vendor invoice / facture), "nda" (non-disclosure / confidentiality agreement) or "other".

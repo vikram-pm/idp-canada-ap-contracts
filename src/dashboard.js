@@ -60,7 +60,7 @@ td{padding:12px;border-top:1px solid var(--line);vertical-align:top}.num{text-al
 .fields{margin-top:8px;font-size:13px}.fields td,.fields th{padding:6px 8px}.why{color:#B42318;font-size:12px;margin-top:2px}
 .empty{padding:48px;text-align:center;color:var(--muted)}footer{padding:16px 32px;color:var(--muted);font-size:12px}
 </style></head><body>
-<header><div><h1>IDP · AP &amp; Contracts · Document queue</h1><div class="sub">Cognizant Canada (internal concept) · synthetic data only</div></div>
+<header><div><h1>IDP · AP &amp; Contracts · Document queue</h1><div class="sub">Concept project · synthetic data only</div></div>
 <div class="live">${opts.live ? '<span class="dot"></span>Live · refreshes every 5 s · <a style="color:#fff" href="?reset=1">Reset demo</a>' : 'Static report · generated ' + esc(new Date().toLocaleString('en-CA'))}</div></header>
 <main>
 <div class="kpis">${kpi('Processed', n, 'documents')}${kpi('Needs a person', review, 'review queue incl. audits')}${kpi('Auto-approved', auto, 'straight-through')}${kpi('Manual', manual, 'unreadable or unclear')}${kpi('Straight-through rate', stp + '%', 'target 40 to 60%')}</div>
